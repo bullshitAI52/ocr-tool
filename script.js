@@ -12,7 +12,9 @@ let appSettings = {
     saveSettings: true,
     // 百度OCR API配置（直接写死）
     baiduApiKey: 'aijosotgUB7lg8E0Oaqqt9y8',
-    baiduSecretKey: 'JB8fXEXlKG78tADksbaMZ6dpVUpugeY3'
+    baiduSecretKey: 'JB8fXEXlKG78tADksbaMZ6dpVUpugeY3',
+    // DeepSeek API配置（直接写死）
+    deepseekApiKey: 'sk-5b229e700ddc4ecd86a11d8394e05164'
 };
 let extractedUrls = [];
 
@@ -270,16 +272,27 @@ async function startOcr() {
     startOcrBtn.disabled = true;
     
     try {
+        console.log('开始OCR识别，引擎:', engine, '语言:', language, '模式:', mode);
+        
         if (engine === 'local') {
             // 本地Tesseract识别
             await startLocalOcr(language, mode);
         } else if (engine === 'api') {
             // 云端AI识别
             await startCloudOcr(language, mode);
+        } else if (engine === 'baidu') {
+            // 百度OCR识别
+            await startBaiduOcr(language, mode);
+        } else if (engine === 'python') {
+            // Python后端识别
+            await startPythonOcr(language, mode);
+        } else {
+            throw new Error(`不支持的OCR引擎: ${engine}`);
         }
         
         // 启用按钮
         startOcrBtn.disabled = false;
+        console.log('OCR识别完成，按钮已启用');
         
         // 3秒后隐藏进度条
         setTimeout(() => {
@@ -287,6 +300,7 @@ async function startOcr() {
         }, 3000);
         
     } catch (error) {
+        console.error('OCR识别错误:', error);
         handleOcrError(error);
     }
 }
@@ -387,6 +401,175 @@ async function startCloudOcr(language, mode) {
         progressStatus.textContent = 'AI识别完成！';
         
     } catch (error) {
+        throw error;
+    }
+}
+
+// 百度OCR识别
+async function startBaiduOcr(language, mode) {
+    console.log('开始百度OCR识别');
+    
+    try {
+        progressStatus.textContent = '正在连接百度OCR服务...';
+        
+        // 获取百度API密钥
+        const baiduApiKey = appSettings.baiduApiKey;
+        const baiduSecretKey = appSettings.baiduSecretKey;
+        
+        if (!baiduApiKey || !baiduSecretKey) {
+            throw new Error('百度OCR API密钥未配置');
+        }
+        
+        // 百度OCR需要先获取access_token
+        progressStatus.textContent = '正在获取百度OCR访问令牌...';
+        progressFill.style.width = '20%';
+        progressPercent.textContent = '20%';
+        
+        // 获取access_token
+        const tokenResponse = await fetch(`https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${baiduApiKey}&client_secret=${baiduSecretKey}`, {
+            method: 'POST'
+        });
+        
+        if (!tokenResponse.ok) {
+            throw new Error(`获取百度访问令牌失败: ${tokenResponse.status}`);
+        }
+        
+        const tokenData = await tokenResponse.json();
+        const accessToken = tokenData.access_token;
+        
+        if (!accessToken) {
+            throw new Error('获取百度访问令牌失败');
+        }
+        
+        // 准备图片数据
+        progressStatus.textContent = '正在准备图片数据...';
+        progressFill.style.width = '40%';
+        progressPercent.textContent = '40%';
+        
+        // 将base64图片转换为二进制
+        const base64Data = currentImage.split(',')[1];
+        const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+        
+        // 构建百度OCR请求
+        const formData = new FormData();
+        const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
+        formData.append('image', blob, 'image.jpg');
+        
+        // 设置语言参数
+        let languageParam = 'CHN_ENG';
+        if (language === 'eng') languageParam = 'ENG';
+        else if (language === 'jpn') languageParam = 'JAP';
+        else if (language === 'kor') languageParam = 'KOR';
+        
+        // 发送OCR请求
+        progressStatus.textContent = '正在上传图片到百度OCR...';
+        progressFill.style.width = '60%';
+        progressPercent.textContent = '60%';
+        
+        const ocrResponse = await fetch(`https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token=${accessToken}`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json'
+            },
+            body: formData
+        });
+        
+        if (!ocrResponse.ok) {
+            throw new Error(`百度OCR服务错误: ${ocrResponse.status}`);
+        }
+        
+        progressStatus.textContent = '正在处理百度OCR结果...';
+        progressFill.style.width = '80%';
+        progressPercent.textContent = '80%';
+        
+        const result = await ocrResponse.json();
+        
+        // 处理百度OCR结果格式
+        const processedResult = {
+            success: !result.error_code,
+            text: result.words_result ? result.words_result.map(item => item.words).join('\n') : '',
+            confidence: 0.95,
+            engine: 'baidu'
+        };
+        
+        if (result.error_code) {
+            throw new Error(`百度OCR错误: ${result.error_msg}`);
+        }
+        
+        // 处理结果
+        await processOcrResult(processedResult, mode, 'baidu');
+        
+        // 更新进度完成
+        progressFill.style.width = '100%';
+        progressPercent.textContent = '100%';
+        progressStatus.textContent = '百度OCR识别完成！';
+        
+    } catch (error) {
+        console.error('百度OCR识别错误:', error);
+        throw error;
+    }
+}
+
+// Python后端识别
+async function startPythonOcr(language, mode) {
+    console.log('开始Python后端OCR识别');
+    
+    try {
+        progressStatus.textContent = '正在连接Python后端服务...';
+        
+        // 获取Python服务器URL
+        const pythonServerUrl = document.getElementById('pythonServerUrl')?.value.trim() || 'http://localhost:5000';
+        
+        if (!pythonServerUrl) {
+            throw new Error('请配置Python后端服务器URL');
+        }
+        
+        // 准备请求数据
+        progressStatus.textContent = '正在准备图片数据...';
+        progressFill.style.width = '30%';
+        progressPercent.textContent = '30%';
+        
+        const requestData = {
+            image: currentImage,
+            language: language,
+            mode: mode,
+            enhance_handwriting: appSettings.enhanceHandwriting
+        };
+        
+        // 发送请求
+        progressStatus.textContent = '正在上传图片到Python后端...';
+        progressFill.style.width = '50%';
+        progressPercent.textContent = '50%';
+        
+        const response = await fetch(`${pythonServerUrl}/ocr`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Python后端错误: ${response.status} ${response.statusText}`);
+        }
+        
+        progressStatus.textContent = '正在处理Python后端结果...';
+        progressFill.style.width = '70%';
+        progressPercent.textContent = '70%';
+        
+        const result = await response.json();
+        
+        // 处理结果
+        await processOcrResult(result, mode, 'python');
+        
+        // 更新进度完成
+        progressFill.style.width = '100%';
+        progressPercent.textContent = '100%';
+        progressStatus.textContent = 'Python后端识别完成！';
+        
+    } catch (error) {
+        console.error('Python后端识别错误:', error);
         throw error;
     }
 }
@@ -852,6 +1035,23 @@ function showAbout() {
     document.getElementById('aboutModal').style.display = 'flex';
 }
 
+function showPythonSetup() {
+    document.getElementById('pythonSetupModal').style.display = 'flex';
+}
+
+function closePythonSetup() {
+    document.getElementById('pythonSetupModal').style.display = 'none';
+}
+
+function copyPythonCode() {
+    const codeElement = document.querySelector('#pythonSetupModal pre code');
+    if (codeElement) {
+        navigator.clipboard.writeText(codeElement.textContent)
+            .then(() => showToast('Python代码已复制到剪贴板', 'success'))
+            .catch(err => showToast('复制失败: ' + err.message, 'error'));
+    }
+}
+
 function closeModal() {
     document.getElementById('aboutModal').style.display = 'none';
 }
@@ -1122,6 +1322,68 @@ async function testApiConnection() {
         }
     } catch (error) {
         showToast(`API连接错误: ${error.message}`, 'error');
+    }
+}
+
+// 测试百度OCR连接
+async function testBaiduConnection() {
+    const baiduApiKey = document.getElementById('baiduApiKey')?.value.trim() || appSettings.baiduApiKey;
+    const baiduSecretKey = document.getElementById('baiduSecretKey')?.value.trim() || appSettings.baiduSecretKey;
+    
+    if (!baiduApiKey || !baiduSecretKey) {
+        showToast('请输入百度OCR API密钥', 'warning');
+        return;
+    }
+    
+    try {
+        showToast('正在测试百度OCR连接...', 'info');
+        
+        // 测试获取access_token
+        const response = await fetch(`https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${baiduApiKey}&client_secret=${baiduSecretKey}`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.access_token) {
+                showToast('百度OCR连接成功！', 'success');
+            } else {
+                showToast(`百度OCR连接失败: ${data.error_description || '未知错误'}`, 'error');
+            }
+        } else {
+            showToast(`百度OCR连接失败: ${response.status}`, 'error');
+        }
+    } catch (error) {
+        showToast(`百度OCR连接错误: ${error.message}`, 'error');
+    }
+}
+
+// 测试Python后端连接
+async function testPythonConnection() {
+    const pythonServerUrl = document.getElementById('pythonServerUrl')?.value.trim() || 'http://localhost:5000';
+    
+    if (!pythonServerUrl) {
+        showToast('请输入Python后端服务器URL', 'warning');
+        return;
+    }
+    
+    try {
+        showToast('正在测试Python后端连接...', 'info');
+        
+        const response = await fetch(`${pythonServerUrl}/health`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            showToast('Python后端连接成功！', 'success');
+        } else {
+            showToast(`Python后端连接失败: ${response.status}`, 'error');
+        }
+    } catch (error) {
+        showToast(`Python后端连接错误: ${error.message}`, 'error');
     }
 }
 
