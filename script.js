@@ -208,6 +208,10 @@ function updateStartButton() {
                 disabled = true;
                 console.log('API配置检查: disabled=true');
             }
+        } else if (engine === 'baidu') {
+            buttonText += ' [百度OCR]';
+            // 百度OCR已经有写死的API密钥，不需要检查
+            console.log('百度OCR引擎，使用写死的API密钥');
         }
     }
     
@@ -869,6 +873,13 @@ function initEngineSelection() {
 function updateEngineUI() {
     const engine = document.querySelector('input[name="engine"]:checked').value;
     const apiConfig = document.querySelector('.api-config');
+    const baiduConfig = document.querySelector('.baidu-config');
+    const pythonConfig = document.querySelector('.python-config');
+    
+    // 隐藏所有配置区域
+    apiConfig.style.display = 'none';
+    baiduConfig.style.display = 'none';
+    pythonConfig.style.display = 'none';
     
     if (engine === 'api') {
         apiConfig.style.display = 'block';
@@ -879,8 +890,19 @@ function updateEngineUI() {
         if (appSettings.apiKey) {
             apiKeyInput.value = appSettings.apiKey;
         }
-    } else {
-        apiConfig.style.display = 'none';
+    } else if (engine === 'baidu') {
+        baiduConfig.style.display = 'block';
+        // 填充百度OCR配置
+        const baiduApiKeyInput = document.getElementById('baiduApiKey');
+        const baiduSecretKeyInput = document.getElementById('baiduSecretKey');
+        if (baiduApiKeyInput && appSettings.baiduApiKey) {
+            baiduApiKeyInput.value = appSettings.baiduApiKey;
+        }
+        if (baiduSecretKeyInput && appSettings.baiduSecretKey) {
+            baiduSecretKeyInput.value = appSettings.baiduSecretKey;
+        }
+    } else if (engine === 'python') {
+        pythonConfig.style.display = 'block';
     }
     
     updateStartButton();
