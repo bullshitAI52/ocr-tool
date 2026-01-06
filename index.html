@@ -21,7 +21,7 @@
                     <i class="fas fa-cloud-upload-alt"></i>
                     <h3>点击或拖拽图片到此区域</h3>
                     <p>支持 JPG、PNG、BMP 格式，最大 10MB</p>
-                    <input type="file" id="fileInput" accept="image/*" hidden>
+                    <input type="file" id="fileInput" accept="image/*" multiple hidden>
                     <button class="btn btn-primary" id="selectImageBtn">
                         <i class="fas fa-folder-open"></i> 选择图片
                     </button>
@@ -55,6 +55,7 @@
                             <label><input type="radio" name="engine" value="local" checked> 本地引擎 (Tesseract)</label>
                             <label><input type="radio" name="engine" value="python"> Python后端 (免费)</label>
                             <label><input type="radio" name="engine" value="baidu"> 百度OCR (API)</label>
+                            <label><input type="radio" name="engine" value="deepseek"> DeepSeek API (AI)</label>
                         </div>
                     </div>
                     <div class="option-group baidu-config" style="display: none;">
@@ -81,6 +82,16 @@
                             </button>
                             <button class="btn btn-small btn-info" onclick="showPythonSetup()">
                                 <i class="fas fa-info-circle"></i> 部署指南
+                            </button>
+                        </div>
+                    </div>
+                    <div class="option-group deepseek-config" style="display: none;">
+                        <label><i class="fas fa-brain"></i> DeepSeek API配置：</label>
+                        <div class="api-inputs">
+                            <input type="password" id="deepseekApiKey" placeholder="DeepSeek API Key" class="api-input">
+                            <input type="text" id="deepseekApiUrl" placeholder="https://api.deepseek.com" class="api-input" value="https://api.deepseek.com">
+                            <button class="btn btn-small" onclick="testDeepSeekConnection()">
+                                <i class="fas fa-plug"></i> 测试DeepSeek连接
                             </button>
                         </div>
                     </div>
@@ -315,6 +326,18 @@
                     <div class="setting-item">
                         <label>Secret Key：</label>
                         <input type="password" id="baiduSecretKey" placeholder="百度Secret Key" class="setting-input">
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h4><i class="fas fa-brain"></i> DeepSeek API配置</h4>
+                    <div class="setting-item">
+                        <label>API Key：</label>
+                        <input type="password" id="deepseekApiKey" placeholder="DeepSeek API Key" class="setting-input">
+                    </div>
+                    <div class="setting-item">
+                        <label>API端点：</label>
+                        <input type="text" id="deepseekApiUrl" placeholder="https://api.deepseek.com" class="setting-input" value="https://api.deepseek.com">
                     </div>
                 </div>
                 

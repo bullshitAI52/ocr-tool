@@ -7,9 +7,11 @@ let appSettings = {
     autoDetectApis: true,
     enhanceHandwriting: true,
     saveSettings: true,
-    // 百度OCR API配置（直接写死）
-    baiduApiKey: 'aijosotgUB7lg8E0Oaqqt9y8',
-    baiduSecretKey: 'JB8fXEXlKG78tADksbaMZ6dpVUpugeY3'
+    // API配置（用户可自定义）
+    baiduApiKey: '',
+    baiduSecretKey: '',
+    deepseekApiKey: '',
+    deepseekApiUrl: 'https://api.deepseek.com'
 };
 let extractedUrls = [];
 
@@ -146,9 +148,22 @@ function initTabSystem() {
 
 // 处理文件选择
 function handleFileSelect(e) {
-    const file = e.target.files[0];
-    if (file) {
-        handleImageFile(file);
+    console.log('文件选择事件触发');
+    const files = e.target.files;
+    console.log(`选择了 ${files.length} 个文件`);
+    
+    if (files.length > 0) {
+        if (files.length === 1) {
+            // 单个文件，直接处理
+            console.log(`选择的文件: ${files[0].name}, 类型: ${files[0].type}, 大小: ${files[0].size} bytes`);
+            handleImageFile(files[0]);
+        } else {
+            // 多个文件，批量处理
+            console.log(`批量选择 ${files.length} 个文件`);
+            handleBatchImages(files);
+        }
+    } else {
+        console.log('未选择文件');
     }
 }
 
@@ -185,6 +200,48 @@ function handleImageFile(file) {
     };
     
     reader.readAsDataURL(file);
+}
+
+// 处理批量图片
+function handleBatchImages(files) {
+    console.log(`开始处理批量图片，共 ${files.length} 个文件`);
+    
+    // 过滤有效的图片文件
+    const validFiles = [];
+    const invalidFiles = [];
+    
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // 检查文件类型
+        if (!file.type.match('image.*')) {
+            invalidFiles.push(`${file.name}：不是图片文件`);
+            continue;
+        }
+        
+        // 检查文件大小（10MB限制）
+        if (file.size > 10 * 1024 * 1024) {
+            invalidFiles.push(`${file.name}：文件大小超过10MB`);
+            continue;
+        }
+        
+        validFiles.push(file);
+    }
+    
+    console.log(`有效文件: ${validFiles.length} 个，无效文件: ${invalidFiles.length} 个`);
+    
+    if (validFiles.length === 0) {
+        alert('没有有效的图片文件');
+        return;
+    }
+    
+    // 显示批量处理信息
+    if (invalidFiles.length > 0) {
+        alert(`以下文件被跳过：\n${invalidFiles.join('\n')}`);
+    }
+    
+    // 创建批量处理界面
+    createBatchProcessingUI(validFiles);
 }
 
 // 更新开始按钮状态
@@ -1207,10 +1264,12 @@ function updateEngineUI() {
     const engine = document.querySelector('input[name="engine"]:checked').value;
     const baiduConfig = document.querySelector('.baidu-config');
     const pythonConfig = document.querySelector('.python-config');
+    const deepseekConfig = document.querySelector('.deepseek-config');
     
     // 隐藏所有配置区域
     baiduConfig.style.display = 'none';
     pythonConfig.style.display = 'none';
+    deepseekConfig.style.display = 'none';
     
     if (engine === 'baidu') {
         baiduConfig.style.display = 'block';
@@ -1225,6 +1284,17 @@ function updateEngineUI() {
         }
     } else if (engine === 'python') {
         pythonConfig.style.display = 'block';
+    } else if (engine === 'deepseek') {
+        deepseekConfig.style.display = 'block';
+        // 填充DeepSeek配置
+        const deepseekApiKeyInput = document.getElementById('deepseekApiKey');
+        const deepseekApiUrlInput = document.getElementById('deepseekApiUrl');
+        if (deepseekApiKeyInput && appSettings.deepseekApiKey) {
+            deepseekApiKeyInput.value = appSettings.deepseekApiKey;
+        }
+        if (deepseekApiUrlInput && appSettings.deepseekApiUrl) {
+            deepseekApiUrlInput.value = appSettings.deepseekApiUrl;
+        }
     }
     
     updateStartButton();
@@ -1475,6 +1545,54 @@ async function testPythonConnection() {
     }
 }
 
+// 测试DeepSeek API连接
+async function testDeepSeekConnection() {
+    const deepseekApiKey = document.getElementById('deepseekApiKey')?.value.trim() || appSettings.deepseekApiKey;
+    const deepseekApiUrl = document.getElementById('deepseekApiUrl')?.value.trim() || appSettings.deepseekApiUrl || 'https://api.deepseek.com';
+    
+    if (!deepseekApiKey) {
+        showToast('请输入DeepSeek API密钥', 'warning');
+        return;
+    }
+    
+    try {
+        showToast('正在测试DeepSeek API连接...', 'info');
+        
+        // 发送一个简单的测试请求
+        const response = await fetch(`${deepseekApiUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${deepseekApiKey}`
+            },
+            body: JSON.stringify({
+                model: "deepseek-chat",
+                messages: [
+                    {
+                        role: "user",
+                        content: "Hello, please respond with 'OK' if you can see this message."
+                    }
+                ],
+                max_tokens: 10
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            if (result.choices && result.choices.length > 0) {
+                showToast('DeepSeek API连接成功！', 'success');
+            } else {
+                showToast('DeepSeek API连接失败: 无响应数据', 'error');
+            }
+        } else {
+            const errorText = await response.text();
+            showToast(`DeepSeek API连接失败: ${response.status} - ${errorText}`, 'error');
+        }
+    } catch (error) {
+        showToast(`DeepSeek API连接错误: ${error.message}`, 'error');
+    }
+}
+
 // 工具函数：DataURL转Blob
 function dataURLtoBlob(dataurl) {
     const arr = dataurl.split(',');
@@ -1491,6 +1609,10 @@ function dataURLtoBlob(dataurl) {
 // 设置管理函数
 function showSettings() {
     // 填充设置表单
+    document.getElementById('baiduApiKey').value = appSettings.baiduApiKey;
+    document.getElementById('baiduSecretKey').value = appSettings.baiduSecretKey;
+    document.getElementById('deepseekApiKey').value = appSettings.deepseekApiKey;
+    document.getElementById('deepseekApiUrl').value = appSettings.deepseekApiUrl;
     document.getElementById('autoDetectUrls').checked = appSettings.autoDetectUrls;
     document.getElementById('autoDetectApis').checked = appSettings.autoDetectApis;
     document.getElementById('enhanceHandwriting').checked = appSettings.enhanceHandwriting;
@@ -1504,6 +1626,10 @@ function closeSettings() {
 }
 
 function saveSettings() {
+    appSettings.baiduApiKey = document.getElementById('baiduApiKey').value.trim();
+    appSettings.baiduSecretKey = document.getElementById('baiduSecretKey').value.trim();
+    appSettings.deepseekApiKey = document.getElementById('deepseekApiKey').value.trim();
+    appSettings.deepseekApiUrl = document.getElementById('deepseekApiUrl').value.trim();
     appSettings.autoDetectUrls = document.getElementById('autoDetectUrls').checked;
     appSettings.autoDetectApis = document.getElementById('autoDetectApis').checked;
     appSettings.enhanceHandwriting = document.getElementById('enhanceHandwriting').checked;
@@ -1528,14 +1654,20 @@ function resetSettings() {
             autoDetectApis: true,
             enhanceHandwriting: true,
             saveSettings: true,
-            // 百度OCR API配置（直接写死）
-            baiduApiKey: 'aijosotgUB7lg8E0Oaqqt9y8',
-            baiduSecretKey: 'JB8fXEXlKG78tADksbaMZ6dpVUpugeY3'
+            // API配置（用户可自定义）
+            baiduApiKey: '',
+            baiduSecretKey: '',
+            deepseekApiKey: '',
+            deepseekApiUrl: 'https://api.deepseek.com'
         };
         
         localStorage.removeItem('ocrToolSettings');
         
         // 更新表单
+        document.getElementById('baiduApiKey').value = '';
+        document.getElementById('baiduSecretKey').value = '';
+        document.getElementById('deepseekApiKey').value = '';
+        document.getElementById('deepseekApiUrl').value = 'https://api.deepseek.com';
         document.getElementById('autoDetectUrls').checked = true;
         document.getElementById('autoDetectApis').checked = true;
         document.getElementById('enhanceHandwriting').checked = true;
@@ -1569,6 +1701,722 @@ window.onclick = function(event) {
         closeSettings();
     }
 };
+
+// 创建批量处理界面
+function createBatchProcessingUI(files) {
+    console.log('创建批量处理界面');
+    
+    // 隐藏原来的上传区域
+    const uploadSection = document.querySelector('.upload-section');
+    if (uploadSection) {
+        uploadSection.style.display = 'none';
+    }
+    
+    // 创建批量处理容器
+    const batchContainer = document.createElement('div');
+    batchContainer.className = 'batch-processing-container';
+    batchContainer.innerHTML = `
+        <div class="batch-header">
+            <h3><i class="fas fa-images"></i> 批量图片处理</h3>
+            <p>共 ${files.length} 个图片文件</p>
+            <button class="btn btn-small" onclick="cancelBatchProcessing()">
+                <i class="fas fa-times"></i> 取消批量处理
+            </button>
+        </div>
+        <div class="batch-controls">
+            <div class="batch-options">
+                <label><i class="fas fa-language"></i> 识别语言：</label>
+                <select id="batchLanguageSelect">
+                    <option value="chi_sim">简体中文</option>
+                    <option value="eng">英语</option>
+                    <option value="chi_tra">繁体中文</option>
+                    <option value="jpn">日语</option>
+                    <option value="kor">韩语</option>
+                    <option value="rus">俄语</option>
+                    <option value="fra">法语</option>
+                    <option value="deu">德语</option>
+                    <option value="spa">西班牙语</option>
+                </select>
+            </div>
+            <div class="batch-options">
+                <label><i class="fas fa-cogs"></i> 识别模式：</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="batchMode" value="text" checked> 文字识别</label>
+                    <label><input type="radio" name="batchMode" value="table"> 表格识别</label>
+                    <label><input type="radio" name="batchMode" value="handwriting"> 手写识别</label>
+                </div>
+            </div>
+            <div class="batch-options">
+                <label><i class="fas fa-cloud"></i> 识别引擎：</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="batchEngine" value="local" checked> 本地引擎</label>
+                    <label><input type="radio" name="batchEngine" value="baidu"> 百度OCR</label>
+                    <label><input type="radio" name="batchEngine" value="python"> Python后端</label>
+                    <label><input type="radio" name="batchEngine" value="deepseek"> DeepSeek API</label>
+                </div>
+            </div>
+            <div class="batch-actions">
+                <button class="btn btn-primary" onclick="startBatchProcessing()">
+                    <i class="fas fa-play"></i> 开始批量处理
+                </button>
+                <button class="btn btn-secondary" onclick="exportBatchResults()">
+                    <i class="fas fa-download"></i> 导出所有结果
+                </button>
+            </div>
+        </div>
+        <div class="batch-progress">
+            <div class="progress-info">
+                <span>准备开始...</span>
+                <span>0/${files.length}</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%"></div>
+            </div>
+        </div>
+        <div class="batch-results" id="batchResults">
+            <div class="no-data">处理结果将显示在这里</div>
+        </div>
+    `;
+    
+    // 插入到主内容区域
+    const main = document.querySelector('main');
+    if (main) {
+        main.insertBefore(batchContainer, main.firstChild);
+    }
+    
+    // 保存文件列表到全局变量
+    window.batchFiles = files;
+    window.batchResults = [];
+    window.currentBatchIndex = 0;
+    
+    console.log('批量处理界面创建完成');
+}
+
+// 开始批量处理
+async function startBatchProcessing() {
+    if (!window.batchFiles || window.batchFiles.length === 0) {
+        showToast('没有可处理的文件', 'warning');
+        return;
+    }
+    
+    const language = document.getElementById('batchLanguageSelect').value;
+    const mode = document.querySelector('input[name="batchMode"]:checked').value;
+    const engine = document.querySelector('input[name="batchEngine"]:checked').value;
+    
+    console.log(`开始批量处理: ${window.batchFiles.length} 个文件, 语言: ${language}, 模式: ${mode}, 引擎: ${engine}`);
+    
+    // 检查引擎配置
+    if (engine === 'baidu' && (!appSettings.baiduApiKey || !appSettings.baiduSecretKey)) {
+        showToast('请先在设置中配置百度OCR API密钥', 'error');
+        return;
+    }
+    
+    if (engine === 'python') {
+        const pythonServerUrl = document.getElementById('pythonServerUrl')?.value.trim() || 'http://localhost:5000';
+        if (!pythonServerUrl) {
+            showToast('请配置Python后端服务器URL', 'error');
+            return;
+        }
+    }
+    
+    if (engine === 'deepseek' && !appSettings.deepseekApiKey) {
+        showToast('请先在设置中配置DeepSeek API密钥', 'error');
+        return;
+    }
+    
+    // 重置结果
+    window.batchResults = [];
+    window.currentBatchIndex = 0;
+    updateBatchProgress(0, '准备开始...');
+    
+    // 禁用开始按钮
+    const startBtn = document.querySelector('.batch-actions .btn-primary');
+    const exportBtn = document.querySelector('.batch-actions .btn-secondary');
+    if (startBtn) {
+        startBtn.disabled = true;
+        startBtn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> 处理中...';
+    }
+    if (exportBtn) {
+        exportBtn.disabled = true;
+    }
+    
+    // 批量处理统计
+    let successCount = 0;
+    let errorCount = 0;
+    
+    // 逐个处理文件
+    for (let i = 0; i < window.batchFiles.length; i++) {
+        window.currentBatchIndex = i;
+        const file = window.batchFiles[i];
+        
+        updateBatchProgress(i + 1, `正在处理: ${file.name}`);
+        
+        try {
+            // 读取文件
+            const imageData = await readFileAsDataURL(file);
+            
+            // 执行OCR识别（带超时控制）
+            const result = await Promise.race([
+                processSingleImage(imageData, language, mode, engine),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('处理超时（30秒）')), 30000)
+                )
+            ]);
+            
+            // 保存结果
+            const resultEntry = {
+                fileName: file.name,
+                fileSize: file.size,
+                language: language,
+                mode: mode,
+                engine: engine,
+                text: result.text || '',
+                confidence: result.confidence || 0,
+                timestamp: new Date().toLocaleString('zh-CN'),
+                success: result.success || false,
+                error: result.error || null
+            };
+            
+            window.batchResults.push(resultEntry);
+            
+            if (resultEntry.success) {
+                successCount++;
+                console.log(`文件 ${file.name} 处理成功`);
+            } else {
+                errorCount++;
+                console.warn(`文件 ${file.name} 处理失败: ${resultEntry.error}`);
+            }
+            
+            // 更新结果列表
+            updateBatchResultsList();
+            
+        } catch (error) {
+            console.error(`处理文件 ${file.name} 失败:`, error);
+            errorCount++;
+            
+            window.batchResults.push({
+                fileName: file.name,
+                fileSize: file.size,
+                language: language,
+                mode: mode,
+                engine: engine,
+                text: '',
+                confidence: 0,
+                timestamp: new Date().toLocaleString('zh-CN'),
+                success: false,
+                error: error.message || '未知错误'
+            });
+            
+            updateBatchResultsList();
+        }
+        
+        // 短暂延迟，避免请求过于频繁
+        if (i < window.batchFiles.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+    }
+    
+    // 完成处理
+    updateBatchProgress(window.batchFiles.length, '批量处理完成！');
+    
+    // 启用按钮
+    if (startBtn) {
+        startBtn.disabled = false;
+        startBtn.innerHTML = '<i class="fas fa-play"></i> 重新处理';
+    }
+    if (exportBtn) {
+        exportBtn.disabled = false;
+    }
+    
+    // 显示处理结果统计
+    const message = `批量处理完成！\n成功: ${successCount} 个文件\n失败: ${errorCount} 个文件`;
+    showToast(message, successCount > 0 ? 'success' : 'warning');
+    
+    // 如果有失败的文件，显示详细错误
+    if (errorCount > 0) {
+        const failedFiles = window.batchResults.filter(r => !r.success);
+        console.log('失败的文件:', failedFiles.map(f => `${f.fileName}: ${f.error}`));
+    }
+}
+
+// 读取文件为DataURL
+function readFileAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (e) => reject(new Error('读取文件失败'));
+        reader.readAsDataURL(file);
+    });
+}
+
+// 处理单个图片
+async function processSingleImage(imageData, language, mode, engine) {
+    console.log(`处理单个图片，引擎: ${engine}`);
+    
+    // 这里可以调用现有的OCR函数
+    // 由于现有函数依赖于全局变量，我们需要创建一个简化的版本
+    // 或者修改现有函数使其可重用
+    
+    // 临时方案：使用Tesseract.js进行本地识别
+    if (engine === 'local') {
+        return await processWithTesseract(imageData, language);
+    } else if (engine === 'baidu') {
+        return await processWithBaidu(imageData, language);
+    } else if (engine === 'python') {
+        return await processWithPython(imageData, language, mode);
+    } else if (engine === 'deepseek') {
+        return await processWithDeepSeek(imageData, language, mode);
+    } else {
+        throw new Error(`不支持的引擎: ${engine}`);
+    }
+}
+
+// 使用Tesseract.js处理
+async function processWithTesseract(imageData, language) {
+    try {
+        const worker = await Tesseract.createWorker();
+        await worker.loadLanguage(language);
+        await worker.initialize(language);
+        
+        const result = await worker.recognize(imageData);
+        await worker.terminate();
+        
+        return {
+            success: true,
+            text: result.data.text,
+            confidence: result.data.confidence
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message,
+            text: '',
+            confidence: 0
+        };
+    }
+}
+
+// 使用百度OCR处理（批量处理版本）
+async function processWithBaidu(imageData, language) {
+    console.log('开始百度OCR批量处理');
+    
+    try {
+        // 获取百度API密钥
+        const baiduApiKey = appSettings.baiduApiKey;
+        const baiduSecretKey = appSettings.baiduSecretKey;
+        
+        if (!baiduApiKey || !baiduSecretKey) {
+            return {
+                success: false,
+                error: '百度OCR API密钥未配置，请在设置中配置',
+                text: '',
+                confidence: 0
+            };
+        }
+        
+        // 获取access_token
+        const tokenResponse = await fetch(`https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${baiduApiKey}&client_secret=${baiduSecretKey}`, {
+            method: 'POST'
+        });
+        
+        if (!tokenResponse.ok) {
+            return {
+                success: false,
+                error: `获取百度访问令牌失败: ${tokenResponse.status}`,
+                text: '',
+                confidence: 0
+            };
+        }
+        
+        const tokenData = await tokenResponse.json();
+        const accessToken = tokenData.access_token;
+        
+        if (!accessToken) {
+            return {
+                success: false,
+                error: '获取百度访问令牌失败',
+                text: '',
+                confidence: 0
+            };
+        }
+        
+        // 将base64图片转换为二进制
+        const base64Data = imageData.split(',')[1];
+        const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+        
+        // 构建百度OCR请求
+        const formData = new FormData();
+        const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
+        formData.append('image', blob, 'image.jpg');
+        
+        // 设置语言参数
+        let languageParam = 'CHN_ENG';
+        if (language === 'eng') languageParam = 'ENG';
+        else if (language === 'jpn') languageParam = 'JAP';
+        else if (language === 'kor') languageParam = 'KOR';
+        
+        // 发送OCR请求
+        const ocrResponse = await fetch(`https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token=${accessToken}`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json'
+            },
+            body: formData
+        });
+        
+        if (!ocrResponse.ok) {
+            return {
+                success: false,
+                error: `百度OCR服务错误: ${ocrResponse.status}`,
+                text: '',
+                confidence: 0
+            };
+        }
+        
+        const result = await ocrResponse.json();
+        
+        if (result.error_code) {
+            return {
+                success: false,
+                error: `百度OCR错误: ${result.error_msg}`,
+                text: '',
+                confidence: 0
+            };
+        }
+        
+        // 处理百度OCR结果格式
+        const text = result.words_result ? result.words_result.map(item => item.words).join('\n') : '';
+        
+        return {
+            success: true,
+            text: text,
+            confidence: 0.95, // 百度OCR不提供置信度，使用默认值
+            engine: 'baidu'
+        };
+        
+    } catch (error) {
+        console.error('百度OCR批量处理错误:', error);
+        return {
+            success: false,
+            error: `百度OCR处理错误: ${error.message}`,
+            text: '',
+            confidence: 0
+        };
+    }
+}
+
+// 使用Python后端处理（批量处理版本）
+async function processWithPython(imageData, language, mode) {
+    console.log('开始Python后端批量处理');
+    
+    try {
+        // 获取Python服务器URL
+        const pythonServerUrl = document.getElementById('pythonServerUrl')?.value.trim() || 'http://localhost:5000';
+        
+        if (!pythonServerUrl) {
+            return {
+                success: false,
+                error: '请配置Python后端服务器URL',
+                text: '',
+                confidence: 0
+            };
+        }
+        
+        // 准备请求数据
+        const requestData = {
+            image: imageData,
+            language: language,
+            mode: mode,
+            engine: 'auto' // 使用自动选择引擎
+        };
+        
+        // 发送请求到Python后端
+        const response = await fetch(`${pythonServerUrl}/ocr`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        if (!response.ok) {
+            return {
+                success: false,
+                error: `Python后端错误: ${response.status} ${response.statusText}`,
+                text: '',
+                confidence: 0
+            };
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            return {
+                success: false,
+                error: result.error || 'Python后端识别失败',
+                text: '',
+                confidence: 0
+            };
+        }
+        
+        return {
+            success: true,
+            text: result.text || '',
+            confidence: result.confidence || 0,
+            engine: result.engine || 'python'
+        };
+        
+    } catch (error) {
+        console.error('Python后端批量处理错误:', error);
+        return {
+            success: false,
+            error: `Python后端连接错误: ${error.message}`,
+            text: '',
+            confidence: 0
+        };
+    }
+}
+
+// 使用DeepSeek API处理（批量处理版本）
+async function processWithDeepSeek(imageData, language, mode) {
+    console.log('开始DeepSeek API批量处理');
+    
+    try {
+        // 获取DeepSeek API配置
+        const deepseekApiKey = appSettings.deepseekApiKey;
+        const deepseekApiUrl = appSettings.deepseekApiUrl || 'https://api.deepseek.com';
+        
+        if (!deepseekApiKey) {
+            return {
+                success: false,
+                error: 'DeepSeek API密钥未配置，请在设置中配置',
+                text: '',
+                confidence: 0
+            };
+        }
+        
+        // 将base64图片转换为文本描述（DeepSeek API需要文本输入）
+        // 这里简化处理：直接发送图片base64数据
+        const base64Data = imageData.split(',')[1];
+        
+        // 构建DeepSeek API请求
+        const requestData = {
+            model: "deepseek-chat",
+            messages: [
+                {
+                    role: "user",
+                    content: [
+                        {
+                            type: "text",
+                            text: `请识别这张图片中的文字。语言：${language}，模式：${mode}。图片base64数据如下：`
+                        },
+                        {
+                            type: "image_url",
+                            image_url: {
+                                url: `data:image/jpeg;base64,${base64Data}`
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens: 1000
+        };
+        
+        // 发送请求到DeepSeek API
+        const response = await fetch(`${deepseekApiUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${deepseekApiKey}`
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            return {
+                success: false,
+                error: `DeepSeek API错误: ${response.status} - ${errorText}`,
+                text: '',
+                confidence: 0
+            };
+        }
+        
+        const result = await response.json();
+        
+        if (result.error) {
+            return {
+                success: false,
+                error: `DeepSeek API错误: ${result.error.message}`,
+                text: '',
+                confidence: 0
+            };
+        }
+        
+        const text = result.choices?.[0]?.message?.content || '';
+        
+        return {
+            success: true,
+            text: text.trim(),
+            confidence: 0.9, // DeepSeek API不提供置信度，使用默认值
+            engine: 'deepseek'
+        };
+        
+    } catch (error) {
+        console.error('DeepSeek API批量处理错误:', error);
+        return {
+            success: false,
+            error: `DeepSeek API处理错误: ${error.message}`,
+            text: '',
+            confidence: 0
+        };
+    }
+}
+
+// 更新批量处理进度
+function updateBatchProgress(current, status) {
+    const progressInfo = document.querySelector('.batch-progress .progress-info');
+    const progressFill = document.querySelector('.batch-progress .progress-fill');
+    const total = window.batchFiles ? window.batchFiles.length : 1;
+    
+    if (progressInfo) {
+        progressInfo.innerHTML = `<span>${status}</span><span>${current}/${total}</span>`;
+    }
+    
+    if (progressFill) {
+        const percent = Math.round((current / total) * 100);
+        progressFill.style.width = `${percent}%`;
+    }
+}
+
+// 更新批量处理结果列表
+function updateBatchResultsList() {
+    const resultsContainer = document.getElementById('batchResults');
+    if (!resultsContainer) return;
+    
+    if (window.batchResults.length === 0) {
+        resultsContainer.innerHTML = '<div class="no-data">处理结果将显示在这里</div>';
+        return;
+    }
+    
+    let html = '';
+    window.batchResults.forEach((result, index) => {
+        const textPreview = result.text.length > 50 ? result.text.substring(0, 50) + '...' : result.text;
+        const statusClass = result.success ? 'success' : 'error';
+        const statusIcon = result.success ? 'fa-check-circle' : 'fa-times-circle';
+        
+        html += `
+            <div class="batch-result-item ${statusClass}">
+                <div class="result-header">
+                    <span class="result-index">${index + 1}</span>
+                    <span class="result-filename">${result.fileName}</span>
+                    <span class="result-status"><i class="fas ${statusIcon}"></i> ${result.success ? '成功' : '失败'}</span>
+                    <span class="result-time">${result.timestamp}</span>
+                </div>
+                <div class="result-content">
+                    <div class="result-info">
+                        <span>语言: ${getLanguageName(result.language)}</span>
+                        <span>模式: ${getModeName(result.mode)}</span>
+                        <span>引擎: ${getEngineName(result.engine)}</span>
+                        ${result.confidence > 0 ? `<span>置信度: ${Math.round(result.confidence)}%</span>` : ''}
+                    </div>
+                    <div class="result-text">${result.success ? textPreview : `错误: ${result.error}`}</div>
+                    <div class="result-actions">
+                        <button class="btn btn-small" onclick="viewBatchResult(${index})">
+                            <i class="fas fa-eye"></i> 查看详情
+                        </button>
+                        <button class="btn btn-small" onclick="copyBatchResult(${index})">
+                            <i class="fas fa-copy"></i> 复制文字
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    resultsContainer.innerHTML = html;
+}
+
+// 查看批量处理结果详情
+function viewBatchResult(index) {
+    const result = window.batchResults[index];
+    if (!result) return;
+    
+    alert(`文件: ${result.fileName}\n\n识别结果:\n${result.text}\n\n${result.error ? `错误: ${result.error}` : `置信度: ${result.confidence}%`}`);
+}
+
+// 复制批量处理结果
+function copyBatchResult(index) {
+    const result = window.batchResults[index];
+    if (!result || !result.text) {
+        showToast('没有可复制的文字', 'warning');
+        return;
+    }
+    
+    navigator.clipboard.writeText(result.text)
+        .then(() => showToast('文字已复制到剪贴板', 'success'))
+        .catch(() => showToast('复制失败', 'error'));
+}
+
+// 导出批量处理结果
+function exportBatchResults() {
+    if (!window.batchResults || window.batchResults.length === 0) {
+        showToast('没有可导出的结果', 'warning');
+        return;
+    }
+    
+    try {
+        const exportData = {
+            exportTime: new Date().toLocaleString('zh-CN'),
+            totalFiles: window.batchFiles.length,
+            successful: window.batchResults.filter(r => r.success).length,
+            failed: window.batchResults.filter(r => !r.success).length,
+            results: window.batchResults
+        };
+        
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `ocr_batch_results_${new Date().getTime()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        showToast('批量处理结果已导出为JSON文件', 'success');
+    } catch (error) {
+        console.error('导出批量处理结果错误:', error);
+        showToast('导出失败: ' + error.message, 'error');
+    }
+}
+
+// 取消批量处理
+function cancelBatchProcessing() {
+    if (confirm('确定要取消批量处理吗？当前进度将丢失。')) {
+        // 恢复原来的上传区域
+        const uploadSection = document.querySelector('.upload-section');
+        if (uploadSection) {
+            uploadSection.style.display = 'block';
+        }
+        
+        // 移除批量处理容器
+        const batchContainer = document.querySelector('.batch-processing-container');
+        if (batchContainer) {
+            batchContainer.remove();
+        }
+        
+        // 清理全局变量
+        delete window.batchFiles;
+        delete window.batchResults;
+        delete window.currentBatchIndex;
+        
+        showToast('已取消批量处理', 'info');
+    }
+}
 
 // 清理worker（页面卸载时）
 window.addEventListener('beforeunload', () => {

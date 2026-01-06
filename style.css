@@ -1138,3 +1138,350 @@ footer a:hover {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/* ==================== 批量处理样式 ==================== */
+
+/* 批量处理容器 */
+.batch-processing-container {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-radius: 15px;
+    padding: 30px;
+    margin-bottom: 30px;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.batch-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e0e6ed;
+}
+
+.batch-header h3 {
+    color: #2c3e50;
+    font-size: 1.8rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.batch-header h3 i {
+    color: #667eea;
+}
+
+.batch-header p {
+    color: #7f8c8d;
+    font-size: 1rem;
+}
+
+/* 批量控制区域 */
+.batch-controls {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 25px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.batch-options {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.batch-options:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.batch-options label {
+    display: block;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.batch-options label i {
+    color: #667eea;
+}
+
+#batchLanguageSelect {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid #e0e6ed;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: #2c3e50;
+    background: white;
+    transition: border-color 0.3s;
+}
+
+#batchLanguageSelect:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.batch-options .radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.batch-options .radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: normal;
+    margin-bottom: 0;
+    cursor: pointer;
+    padding: 8px 15px;
+    border-radius: 8px;
+    background: #f8f9fa;
+    transition: all 0.3s;
+}
+
+.batch-options .radio-group label:hover {
+    background: #e9ecef;
+}
+
+.batch-options .radio-group input[type="radio"] {
+    margin: 0;
+}
+
+.batch-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 2px solid #f0f0f0;
+}
+
+.batch-actions .btn {
+    flex: 1;
+    justify-content: center;
+}
+
+/* 批量进度条 */
+.batch-progress {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.batch-progress .progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    font-size: 1rem;
+}
+
+.batch-progress .progress-info span:first-child {
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+.batch-progress .progress-info span:last-child {
+    color: #667eea;
+    font-weight: 600;
+}
+
+.batch-progress .progress-bar {
+    height: 12px;
+    background: #f0f0f0;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.batch-progress .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 6px;
+    transition: width 0.3s ease;
+}
+
+/* 批量结果区域 */
+.batch-results {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.batch-result-item {
+    border: 1px solid #e0e6ed;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 15px;
+    transition: all 0.3s;
+}
+
+.batch-result-item:hover {
+    border-color: #667eea;
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.1);
+}
+
+.batch-result-item.success {
+    border-left: 4px solid #38b2ac;
+}
+
+.batch-result-item.error {
+    border-left: 4px solid #e53e3e;
+}
+
+.result-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.result-index {
+    background: #667eea;
+    color: white;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.result-filename {
+    flex: 1;
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.result-status {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.success .result-status {
+    background: rgba(56, 178, 172, 0.1);
+    color: #38b2ac;
+}
+
+.error .result-status {
+    background: rgba(229, 62, 62, 0.1);
+    color: #e53e3e;
+}
+
+.result-time {
+    color: #7f8c8d;
+    font-size: 0.85rem;
+}
+
+.result-content {
+    padding-left: 45px;
+}
+
+.result-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+    color: #7f8c8d;
+}
+
+.result-info span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.result-text {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: #2c3e50;
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+.error .result-text {
+    color: #e53e3e;
+    background: rgba(229, 62, 62, 0.05);
+}
+
+.result-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.result-actions .btn-small {
+    padding: 6px 15px;
+    font-size: 0.85rem;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .batch-processing-container {
+        padding: 20px;
+    }
+    
+    .batch-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .batch-controls {
+        padding: 20px;
+    }
+    
+    .batch-options .radio-group {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .batch-actions {
+        flex-direction: column;
+    }
+    
+    .result-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .result-content {
+        padding-left: 0;
+    }
+    
+    .result-info {
+        flex-direction: column;
+        gap: 8px;
+    }
+}
