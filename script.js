@@ -9,7 +9,10 @@ let appSettings = {
     autoDetectUrls: true,
     autoDetectApis: true,
     enhanceHandwriting: true,
-    saveSettings: true
+    saveSettings: true,
+    // 百度OCR API配置（直接写死）
+    baiduApiKey: 'aijosotgUB7lg8E0Oaqqt9y8',
+    baiduSecretKey: 'JB8fXEXlKG78tADksbaMZ6dpVUpugeY3'
 };
 let extractedUrls = [];
 
@@ -33,12 +36,21 @@ const apiKeyInput = document.getElementById('apiKey');
 
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== OCR工具初始化开始 ===');
+    console.log('DOM元素检查:');
+    console.log('fileInput:', fileInput ? '找到' : '未找到');
+    console.log('uploadArea:', uploadArea ? '找到' : '未找到');
+    console.log('imagePreview:', imagePreview ? '找到' : '未找到');
+    console.log('startOcrBtn:', startOcrBtn ? '找到' : '未找到');
+    
     loadSettings();
     initEventListeners();
     initTabSystem();
     initEngineSelection();
     updateStartButton();
     updateModeUI();
+    
+    console.log('=== OCR工具初始化完成 ===');
 });
 
 // 初始化事件监听
@@ -148,13 +160,17 @@ function handleImageFile(file) {
     
     reader.onload = function(e) {
         currentImage = e.target.result;
+        console.log('图片已加载，currentImage:', currentImage ? '有值' : 'null');
+        console.log('图片数据长度:', currentImage ? currentImage.length : 0);
         
         // 显示预览
         imagePreview.src = currentImage;
         imagePreview.style.display = 'block';
         previewPlaceholder.style.display = 'none';
+        console.log('图片预览已设置');
         
         // 启用开始按钮
+        console.log('调用 updateStartButton...');
         updateStartButton();
     };
     
@@ -163,13 +179,18 @@ function handleImageFile(file) {
 
 // 更新开始按钮状态
 function updateStartButton() {
+    console.log('=== updateStartButton 被调用 ===');
     const hasImage = currentImage !== null;
+    console.log('hasImage:', hasImage, 'currentImage:', currentImage ? '有值' : 'null');
+    
     const selectedLanguage = languageSelect.value;
     const mode = document.querySelector('input[name="mode"]:checked').value;
     const engine = document.querySelector('input[name="engine"]:checked').value;
     
     let disabled = !hasImage;
     let buttonText = '开始识别';
+    
+    console.log('初始 disabled:', disabled);
     
     if (hasImage) {
         buttonText = `开始识别 (${getLanguageName(selectedLanguage)})`;
@@ -185,12 +206,24 @@ function updateStartButton() {
             // 检查API配置
             if (!apiUrlInput.value.trim() && !appSettings.apiUrl) {
                 disabled = true;
+                console.log('API配置检查: disabled=true');
             }
         }
     }
     
-    startOcrBtn.disabled = disabled;
-    startOcrBtn.innerHTML = `<i class="fas fa-play"></i> ${buttonText}`;
+    console.log('最终 disabled:', disabled);
+    console.log('buttonText:', buttonText);
+    console.log('startOcrBtn:', startOcrBtn ? '找到' : '未找到');
+    
+    if (startOcrBtn) {
+        startOcrBtn.disabled = disabled;
+        startOcrBtn.innerHTML = `<i class="fas fa-play"></i> ${buttonText}`;
+        console.log('按钮状态已更新');
+    } else {
+        console.error('错误: startOcrBtn 未找到!');
+    }
+    
+    console.log('=== updateStartButton 结束 ===');
 }
 
 // 获取语言名称
