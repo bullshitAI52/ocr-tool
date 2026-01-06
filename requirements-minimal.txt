@@ -1,5 +1,0 @@
-# OCR工具Python后端最小依赖
-Flask>=2.3.0
-Flask-CORS>=4.0.0
-Pillow>=10.0.0
-requests>=2.31.0
