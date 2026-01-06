@@ -1,0 +1,25 @@
+# GitHub Pages 配置
+title: 智能OCR识别工具
+description: 在线图片文字、表格、手写识别工具
+baseurl: "/ocr-tool" # 子目录名称
+url: "https://bullshitai52.github.io" # 你的GitHub Pages域名
+
+# 构建设置
+markdown: kramdown
+theme: null # 不使用Jekyll主题
+plugins: []
+
+# 排除文件
+exclude:
+  - README.md
+  - requirements.txt
+  - requirements-minimal.txt
+  - server.py
+  - server_enhanced.py
+  - install.sh
+  - Dockerfile
+  - docker-compose.yml
+  - venv/
+  - .github/
+  - .gitignore
+  - _config.yml
