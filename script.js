@@ -1564,53 +1564,6 @@ async function testPythonConnection() {
     }
 }
 
-// 测试DeepSeek API连接
-async function testDeepSeekConnection() {
-    const deepseekApiKey = document.getElementById('deepseekApiKey')?.value.trim() || appSettings.deepseekApiKey;
-    const deepseekApiUrl = document.getElementById('deepseekApiUrl')?.value.trim() || appSettings.deepseekApiUrl || 'https://api.deepseek.com';
-    
-    if (!deepseekApiKey) {
-        showToast('请输入DeepSeek API密钥', 'warning');
-        return;
-    }
-    
-    try {
-        showToast('正在测试DeepSeek API连接...', 'info');
-        
-        // 发送一个简单的测试请求
-        const response = await fetch(`${deepseekApiUrl}/chat/completions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${deepseekApiKey}`
-            },
-            body: JSON.stringify({
-                model: "deepseek-chat",
-                messages: [
-                    {
-                        role: "user",
-                        content: "Hello, please respond with 'OK' if you can see this message."
-                    }
-                ],
-                max_tokens: 10
-            })
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            if (result.choices && result.choices.length > 0) {
-                showToast('DeepSeek API连接成功！', 'success');
-            } else {
-                showToast('DeepSeek API连接失败: 无响应数据', 'error');
-            }
-        } else {
-            const errorText = await response.text();
-            showToast(`DeepSeek API连接失败: ${response.status} - ${errorText}`, 'error');
-        }
-    } catch (error) {
-        showToast(`DeepSeek API连接错误: ${error.message}`, 'error');
-    }
-}
 
 // 工具函数：DataURL转Blob
 function dataURLtoBlob(dataurl) {
