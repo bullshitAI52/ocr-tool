@@ -3,18 +3,13 @@ let currentImage = null;
 let ocrResult = null;
 let tesseractWorker = null;
 let appSettings = {
-    apiUrl: '',
-    apiKey: '',
-    aiProvider: 'custom',
     autoDetectUrls: true,
     autoDetectApis: true,
     enhanceHandwriting: true,
     saveSettings: true,
     // 百度OCR API配置（直接写死）
     baiduApiKey: 'aijosotgUB7lg8E0Oaqqt9y8',
-    baiduSecretKey: 'JB8fXEXlKG78tADksbaMZ6dpVUpugeY3',
-    // DeepSeek API配置（直接写死）
-    deepseekApiKey: 'sk-5b229e700ddc4ecd86a11d8394e05164'
+    baiduSecretKey: 'JB8fXEXlKG78tADksbaMZ6dpVUpugeY3'
 };
 let extractedUrls = [];
 
@@ -34,8 +29,6 @@ const progressSection = document.getElementById('progressSection');
 const progressFill = document.getElementById('progressFill');
 const progressStatus = document.getElementById('progressStatus');
 const progressPercent = document.getElementById('progressPercent');
-const apiUrlInput = document.getElementById('apiUrl');
-const apiKeyInput = document.getElementById('apiKey');
 
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -53,6 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initEngineSelection();
     updateStartButton();
     updateModeUI();
+    updateHistoryList(); // 初始化历史记录显示
     
     console.log('=== OCR工具初始化完成 ===');
 });
@@ -217,14 +211,7 @@ function updateStartButton() {
             buttonText += ' - 表格识别';
         }
         
-        if (engine === 'api') {
-            buttonText += ' [云端AI]';
-            // 检查API配置
-            if (!apiUrlInput.value.trim() && !appSettings.apiUrl) {
-                disabled = true;
-                console.log('API配置检查: disabled=true');
-            }
-        } else if (engine === 'baidu') {
+        if (engine === 'baidu') {
             buttonText += ' [百度OCR]';
             // 百度OCR已经有写死的API密钥，不需要检查
             console.log('百度OCR引擎，使用写死的API密钥');
@@ -291,9 +278,6 @@ async function startOcr() {
         if (engine === 'local') {
             // 本地Tesseract识别
             await startLocalOcr(language, mode);
-        } else if (engine === 'api') {
-            // 云端AI识别
-            await startCloudOcr(language, mode);
         } else if (engine === 'baidu') {
             // 百度OCR识别
             await startBaiduOcr(language, mode);
@@ -357,67 +341,6 @@ async function startLocalOcr(language, mode) {
 }
 
 // 云端AI识别
-async function startCloudOcr(language, mode) {
-    const apiUrl = apiUrlInput.value.trim() || appSettings.apiUrl;
-    const apiKey = apiKeyInput.value.trim() || appSettings.apiKey;
-    
-    if (!apiUrl) {
-        throw new Error('请配置API端点URL');
-    }
-    
-    try {
-        progressStatus.textContent = '正在连接AI服务...';
-        
-        // 准备请求数据
-        const formData = new FormData();
-        const blob = dataURLtoBlob(currentImage);
-        formData.append('image', blob, 'image.jpg');
-        formData.append('language', language);
-        formData.append('mode', mode);
-        formData.append('enhance_handwriting', appSettings.enhanceHandwriting.toString());
-        
-        // 构建请求头
-        const headers = {
-            'Accept': 'application/json'
-        };
-        
-        if (apiKey) {
-            headers['Authorization'] = `Bearer ${apiKey}`;
-        }
-        
-        // 发送请求
-        progressStatus.textContent = '正在上传图片到AI服务...';
-        progressFill.style.width = '30%';
-        progressPercent.textContent = '30%';
-        
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: headers,
-            body: formData
-        });
-        
-        if (!response.ok) {
-            throw new Error(`AI服务错误: ${response.status} ${response.statusText}`);
-        }
-        
-        progressStatus.textContent = '正在处理AI识别结果...';
-        progressFill.style.width = '70%';
-        progressPercent.textContent = '70%';
-        
-        const result = await response.json();
-        
-        // 处理结果
-        await processOcrResult(result, mode, 'cloud');
-        
-        // 更新进度完成
-        progressFill.style.width = '100%';
-        progressPercent.textContent = '100%';
-        progressStatus.textContent = 'AI识别完成！';
-        
-    } catch (error) {
-        throw error;
-    }
-}
 
 // 百度OCR识别
 async function startBaiduOcr(language, mode) {
@@ -803,6 +726,202 @@ function copyText() {
     }
 }
 
+// 保存到历史记录
+function saveToHistory() {
+    if (!textOutput.value.trim()) {
+        showToast('没有可保存的内容', 'warning');
+        return;
+    }
+    
+    try {
+        // 获取当前时间
+        const now = new Date();
+        const timestamp = now.toLocaleString('zh-CN');
+        
+        // 创建历史记录项
+        const historyItem = {
+            id: Date.now(),
+            timestamp: timestamp,
+            text: textOutput.value.trim(),
+            image: currentImage ? currentImage.substring(0, 100) + '...' : null, // 只保存图片预览
+            language: languageSelect.value,
+            mode: document.querySelector('input[name="mode"]:checked').value,
+            engine: document.querySelector('input[name="engine"]:checked').value
+        };
+        
+        // 从本地存储获取现有历史记录
+        let history = JSON.parse(localStorage.getItem('ocrHistory') || '[]');
+        
+        // 添加到历史记录
+        history.unshift(historyItem); // 添加到开头
+        
+        // 限制历史记录数量（最多50条）
+        if (history.length > 50) {
+            history = history.slice(0, 50);
+        }
+        
+        // 保存到本地存储
+        localStorage.setItem('ocrHistory', JSON.stringify(history));
+        
+        // 更新历史记录显示
+        updateHistoryList();
+        
+        showToast('已保存到历史记录', 'success');
+        
+    } catch (error) {
+        console.error('保存历史记录错误:', error);
+        showToast('保存失败: ' + error.message, 'error');
+    }
+}
+
+// 更新历史记录列表
+function updateHistoryList() {
+    const historyList = document.getElementById('historyList');
+    if (!historyList) return;
+    
+    try {
+        const history = JSON.parse(localStorage.getItem('ocrHistory') || '[]');
+        
+        if (history.length === 0) {
+            historyList.innerHTML = '<div class="no-data">暂无历史记录</div>';
+            return;
+        }
+        
+        let html = '';
+        history.forEach(item => {
+            const textPreview = item.text.length > 100 ? item.text.substring(0, 100) + '...' : item.text;
+            html += `
+                <div class="history-item">
+                    <div class="history-header">
+                        <span class="history-time">${item.timestamp}</span>
+                        <span class="history-info">${getLanguageName(item.language)} | ${getModeName(item.mode)} | ${getEngineName(item.engine)}</span>
+                    </div>
+                    <div class="history-text">${textPreview}</div>
+                    <div class="history-actions">
+                        <button class="btn btn-small" onclick="loadHistoryItem(${item.id})">
+                            <i class="fas fa-eye"></i> 查看
+                        </button>
+                        <button class="btn btn-small btn-danger" onclick="deleteHistoryItem(${item.id})">
+                            <i class="fas fa-trash"></i> 删除
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        historyList.innerHTML = html;
+    } catch (error) {
+        console.error('更新历史记录列表错误:', error);
+        historyList.innerHTML = '<div class="no-data">加载历史记录失败</div>';
+    }
+}
+
+// 获取模式名称
+function getModeName(mode) {
+    const modes = {
+        'text': '文字识别',
+        'table': '表格识别',
+        'handwriting': '手写识别'
+    };
+    return modes[mode] || mode;
+}
+
+// 获取引擎名称
+function getEngineName(engine) {
+    const engines = {
+        'local': '本地引擎',
+        'baidu': '百度OCR',
+        'python': 'Python后端'
+    };
+    return engines[engine] || engine;
+}
+
+// 加载历史记录项
+function loadHistoryItem(id) {
+    try {
+        const history = JSON.parse(localStorage.getItem('ocrHistory') || '[]');
+        const item = history.find(h => h.id === id);
+        
+        if (item) {
+            textOutput.value = item.text;
+            showToast('已加载历史记录', 'success');
+            
+            // 切换到文字结果标签页
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+            
+            document.querySelector('.tab-btn[data-tab="textResult"]').classList.add('active');
+            document.getElementById('textResult').classList.add('active');
+        }
+    } catch (error) {
+        console.error('加载历史记录项错误:', error);
+        showToast('加载失败: ' + error.message, 'error');
+    }
+}
+
+// 删除历史记录项
+function deleteHistoryItem(id) {
+    if (!confirm('确定要删除这条历史记录吗？')) {
+        return;
+    }
+    
+    try {
+        let history = JSON.parse(localStorage.getItem('ocrHistory') || '[]');
+        history = history.filter(h => h.id !== id);
+        localStorage.setItem('ocrHistory', JSON.stringify(history));
+        updateHistoryList();
+        showToast('已删除历史记录', 'success');
+    } catch (error) {
+        console.error('删除历史记录项错误:', error);
+        showToast('删除失败: ' + error.message, 'error');
+    }
+}
+
+// 清空历史记录
+function clearHistory() {
+    if (!confirm('确定要清空所有历史记录吗？此操作不可撤销。')) {
+        return;
+    }
+    
+    try {
+        localStorage.removeItem('ocrHistory');
+        updateHistoryList();
+        showToast('已清空历史记录', 'success');
+    } catch (error) {
+        console.error('清空历史记录错误:', error);
+        showToast('清空失败: ' + error.message, 'error');
+    }
+}
+
+// 导出历史记录
+function exportHistory() {
+    try {
+        const history = JSON.parse(localStorage.getItem('ocrHistory') || '[]');
+        
+        if (history.length === 0) {
+            showToast('没有可导出的历史记录', 'warning');
+            return;
+        }
+        
+        const dataStr = JSON.stringify(history, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `ocr_history_${new Date().getTime()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        showToast('历史记录已导出为JSON文件', 'success');
+    } catch (error) {
+        console.error('导出历史记录错误:', error);
+        showToast('导出失败: ' + error.message, 'error');
+    }
+}
+
 function downloadText() {
     if (!textOutput.value.trim()) {
         showToast('没有可下载的内容', 'warning');
@@ -1086,25 +1205,14 @@ function initEngineSelection() {
 // 更新引擎UI
 function updateEngineUI() {
     const engine = document.querySelector('input[name="engine"]:checked').value;
-    const apiConfig = document.querySelector('.api-config');
     const baiduConfig = document.querySelector('.baidu-config');
     const pythonConfig = document.querySelector('.python-config');
     
     // 隐藏所有配置区域
-    apiConfig.style.display = 'none';
     baiduConfig.style.display = 'none';
     pythonConfig.style.display = 'none';
     
-    if (engine === 'api') {
-        apiConfig.style.display = 'block';
-        // 填充API配置
-        if (appSettings.apiUrl) {
-            apiUrlInput.value = appSettings.apiUrl;
-        }
-        if (appSettings.apiKey) {
-            apiKeyInput.value = appSettings.apiKey;
-        }
-    } else if (engine === 'baidu') {
+    if (engine === 'baidu') {
         baiduConfig.style.display = 'block';
         // 填充百度OCR配置
         const baiduApiKeyInput = document.getElementById('baiduApiKey');
@@ -1304,40 +1412,6 @@ function testApiEndpoints() {
 }
 
 // 测试API连接
-async function testApiConnection() {
-    const apiUrl = apiUrlInput.value.trim() || appSettings.apiUrl;
-    const apiKey = apiKeyInput.value.trim() || appSettings.apiKey;
-    
-    if (!apiUrl) {
-        showToast('请输入API端点URL', 'warning');
-        return;
-    }
-    
-    try {
-        showToast('正在测试API连接...', 'info');
-        
-        const headers = {
-            'Accept': 'application/json'
-        };
-        
-        if (apiKey) {
-            headers['Authorization'] = `Bearer ${apiKey}`;
-        }
-        
-        const response = await fetch(apiUrl, {
-            method: 'HEAD',
-            headers: headers
-        });
-        
-        if (response.ok) {
-            showToast('API连接成功！', 'success');
-        } else {
-            showToast(`API连接失败: ${response.status}`, 'error');
-        }
-    } catch (error) {
-        showToast(`API连接错误: ${error.message}`, 'error');
-    }
-}
 
 // 测试百度OCR连接
 async function testBaiduConnection() {
@@ -1417,9 +1491,6 @@ function dataURLtoBlob(dataurl) {
 // 设置管理函数
 function showSettings() {
     // 填充设置表单
-    document.getElementById('defaultApiUrl').value = appSettings.apiUrl;
-    document.getElementById('defaultApiKey').value = appSettings.apiKey;
-    document.getElementById('aiProvider').value = appSettings.aiProvider;
     document.getElementById('autoDetectUrls').checked = appSettings.autoDetectUrls;
     document.getElementById('autoDetectApis').checked = appSettings.autoDetectApis;
     document.getElementById('enhanceHandwriting').checked = appSettings.enhanceHandwriting;
@@ -1433,9 +1504,6 @@ function closeSettings() {
 }
 
 function saveSettings() {
-    appSettings.apiUrl = document.getElementById('defaultApiUrl').value.trim();
-    appSettings.apiKey = document.getElementById('defaultApiKey').value.trim();
-    appSettings.aiProvider = document.getElementById('aiProvider').value;
     appSettings.autoDetectUrls = document.getElementById('autoDetectUrls').checked;
     appSettings.autoDetectApis = document.getElementById('autoDetectApis').checked;
     appSettings.enhanceHandwriting = document.getElementById('enhanceHandwriting').checked;
@@ -1448,10 +1516,6 @@ function saveSettings() {
         localStorage.removeItem('ocrToolSettings');
     }
     
-    // 更新当前API输入
-    apiUrlInput.value = appSettings.apiUrl;
-    apiKeyInput.value = appSettings.apiKey;
-    
     showToast('设置已保存', 'success');
     closeSettings();
     updateStartButton();
@@ -1460,21 +1524,18 @@ function saveSettings() {
 function resetSettings() {
     if (confirm('确定要恢复默认设置吗？')) {
         appSettings = {
-            apiUrl: '',
-            apiKey: '',
-            aiProvider: 'custom',
             autoDetectUrls: true,
             autoDetectApis: true,
             enhanceHandwriting: true,
-            saveSettings: true
+            saveSettings: true,
+            // 百度OCR API配置（直接写死）
+            baiduApiKey: 'aijosotgUB7lg8E0Oaqqt9y8',
+            baiduSecretKey: 'JB8fXEXlKG78tADksbaMZ6dpVUpugeY3'
         };
         
         localStorage.removeItem('ocrToolSettings');
         
         // 更新表单
-        document.getElementById('defaultApiUrl').value = '';
-        document.getElementById('defaultApiKey').value = '';
-        document.getElementById('aiProvider').value = 'custom';
         document.getElementById('autoDetectUrls').checked = true;
         document.getElementById('autoDetectApis').checked = true;
         document.getElementById('enhanceHandwriting').checked = true;

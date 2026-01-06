@@ -55,17 +55,6 @@
                             <label><input type="radio" name="engine" value="local" checked> 本地引擎 (Tesseract)</label>
                             <label><input type="radio" name="engine" value="python"> Python后端 (免费)</label>
                             <label><input type="radio" name="engine" value="baidu"> 百度OCR (API)</label>
-                            <label><input type="radio" name="engine" value="api"> 其他云端AI</label>
-                        </div>
-                    </div>
-                    <div class="option-group api-config" style="display: none;">
-                        <label><i class="fas fa-key"></i> API配置：</label>
-                        <div class="api-inputs">
-                            <input type="text" id="apiUrl" placeholder="API端点URL (可选)" class="api-input">
-                            <input type="text" id="apiKey" placeholder="API密钥 (可选)" class="api-input">
-                            <button class="btn btn-small" onclick="testApiConnection()">
-                                <i class="fas fa-plug"></i> 测试连接
-                            </button>
                         </div>
                     </div>
                     <div class="option-group baidu-config" style="display: none;">
@@ -316,27 +305,6 @@
                 <button class="close-btn" onclick="closeSettings()">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="settings-section">
-                    <h4><i class="fas fa-cloud"></i> 云端AI配置</h4>
-                    <div class="setting-item">
-                        <label>默认API端点：</label>
-                        <input type="text" id="defaultApiUrl" placeholder="https://api.example.com/ocr" class="setting-input">
-                    </div>
-                    <div class="setting-item">
-                        <label>API密钥：</label>
-                        <input type="password" id="defaultApiKey" placeholder="输入API密钥" class="setting-input">
-                    </div>
-                    <div class="setting-item">
-                        <label>AI提供商：</label>
-                        <select id="aiProvider" class="setting-select">
-                            <option value="custom">自定义API</option>
-                            <option value="openai">OpenAI</option>
-                            <option value="google">Google Cloud Vision</option>
-                            <option value="azure">Azure Cognitive Services</option>
-                            <option value="baidu">百度AI</option>
-                        </select>
-                    </div>
-                </div>
                 
                 <div class="settings-section">
                     <h4><i class="fas fa-cogs"></i> 百度OCR配置</h4>
