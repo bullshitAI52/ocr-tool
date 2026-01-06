@@ -457,6 +457,146 @@ function extractTableData(ocrData) {
     return tableData;
 }
 
+// 专门处理课程表数据
+function processTimetableData(tableData) {
+    if (!tableData || tableData.length === 0) {
+        return tableData;
+    }
+    
+    const processedData = [];
+    
+    // 尝试检测课程表特征
+    const isLikelyTimetable = tableData.some(row => 
+        row.some(cell => 
+            cell.includes('星期') || 
+            cell.includes('周一') || cell.includes('周二') || 
+            cell.includes('周三') || cell.includes('周四') || 
+            cell.includes('周五') || cell.includes('周六') || cell.includes('周日') ||
+            cell.includes('节') || cell.includes('课') ||
+            cell.match(/第[一二三四五六七八九十]+节/) ||
+            cell.match(/[0-9]+:[0-9]+/)
+        )
+    );
+    
+    if (!isLikelyTimetable) {
+        return tableData; // 不是课程表，返回原数据
+    }
+    
+    console.log('检测到课程表数据，进行优化处理...');
+    
+    // 课程表优化处理
+    tableData.forEach((row, rowIndex) => {
+        const processedRow = [];
+        
+        row.forEach((cell, cellIndex) => {
+            let processedCell = cell;
+            
+            // 清理常见OCR错误
+            processedCell = processedCell
+                .replace(/[|]/g, '')  // 移除竖线
+                .replace(/[{}]/g, '')  // 移除花括号
+                .replace(/[\[\]]/g, '') // 移除方括号
+                .replace(/\s+/g, ' ')   // 合并多个空格
+                .trim();
+            
+            // 修复常见课程表OCR错误
+            const corrections = {
+                '星朋': '星期',
+                '星明': '星期',
+                '周木': '周四',
+                '周未': '周六',
+                '数宇': '数学',
+                '英话': '英语',
+                '物埋': '物理',
+                '化字': '化学',
+                '生杨': '生物',
+                '地埋': '地理',
+                '厉吏': '历史',
+                '改治': '政治',
+                '休有': '体育',
+                '音牙': '音乐',
+                '美木': '美术',
+                '信忌': '信息',
+                '技木': '技术',
+                '实脸': '实验',
+                '自刁': '自习',
+                '班合': '班会',
+            };
+            
+            Object.keys(corrections).forEach(wrong => {
+                if (processedCell.includes(wrong)) {
+                    processedCell = processedCell.replace(wrong, corrections[wrong]);
+                }
+            });
+            
+            processedRow.push(processedCell);
+        });
+        
+        processedData.push(processedRow);
+    });
+    
+    return processedData;
+}
+
+// 导出为Excel格式（XLSX）
+function exportToExcel(tableData, filename = '课程表') {
+    if (!tableData || tableData.length === 0) {
+        showToast('没有表格数据可导出', 'warning');
+        return;
+    }
+    
+    try {
+        // 创建CSV内容（Excel可以直接打开CSV）
+        let csvContent = '';
+        
+        // 添加UTF-8 BOM以便Excel正确显示中文
+        const BOM = '\uFEFF';
+        csvContent = BOM;
+        
+        // 添加数据
+        tableData.forEach(row => {
+            const escapedRow = row.map(cell => {
+                // 处理特殊字符
+                let escapedCell = cell.toString();
+                
+                // 如果包含逗号、引号或换行，用引号包裹
+                if (escapedCell.includes(',') || escapedCell.includes('"') || escapedCell.includes('\n')) {
+                    escapedCell = '"' + escapedCell.replace(/"/g, '""') + '"';
+                }
+                
+                return escapedCell;
+            });
+            
+            csvContent += escapedRow.join(',') + '\n';
+        });
+        
+        // 创建Blob并下载
+        const blob = new Blob([csvContent], { 
+            type: 'text/csv;charset=utf-8;' 
+        });
+        
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${filename}_${new Date().getTime()}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        showToast('课程表已导出为Excel兼容格式(CSV)', 'success');
+        
+        // 提供使用提示
+        setTimeout(() => {
+            showToast('提示：用Excel打开CSV文件，可另存为XLSX格式', 'info');
+        }, 2000);
+        
+    } catch (error) {
+        console.error('导出Excel错误:', error);
+        showToast('导出失败: ' + error.message, 'error');
+    }
+}
+
 // 更新表格输出
 function updateTableOutput(tableData) {
     const tbody = tableOutput.querySelector('tbody');
@@ -473,8 +613,12 @@ function updateTableOutput(tableData) {
         return;
     }
     
+    // 应用课程表优化处理
+    const processedData = processTimetableData(tableData);
+    const isTimetable = processedData !== tableData; // 检查是否被优化处理过
+    
     // 确定最大列数
-    let maxCols = Math.max(...tableData.map(row => row.length));
+    let maxCols = Math.max(...processedData.map(row => row.length));
     maxCols = Math.max(maxCols, 3); // 至少3列
     
     // 更新表头
@@ -482,22 +626,78 @@ function updateTableOutput(tableData) {
     thead.innerHTML = '';
     for (let i = 0; i < maxCols; i++) {
         const th = document.createElement('th');
-        th.textContent = `列${i + 1}`;
+        // 如果是课程表，尝试智能命名列
+        if (isTimetable && i === 0) {
+            th.textContent = '时间/星期';
+        } else if (isTimetable) {
+            th.textContent = `星期${i}`;
+        } else {
+            th.textContent = `列${i + 1}`;
+        }
         thead.appendChild(th);
     }
     
     // 添加数据行
-    tableData.forEach(rowData => {
+    processedData.forEach((rowData, rowIndex) => {
         const row = document.createElement('tr');
+        
+        // 如果是课程表，添加行号
+        if (isTimetable) {
+            row.setAttribute('data-row-index', rowIndex);
+        }
         
         for (let i = 0; i < maxCols; i++) {
             const cell = document.createElement('td');
-            cell.textContent = rowData[i] || '';
+            const cellContent = rowData[i] || '';
+            cell.textContent = cellContent;
+            
+            // 如果是课程表，添加样式提示
+            if (isTimetable && cellContent) {
+                if (cellContent.includes('数学') || cellContent.includes('算术')) {
+                    cell.style.backgroundColor = '#e3f2fd';
+                } else if (cellContent.includes('语文') || cellContent.includes('中文')) {
+                    cell.style.backgroundColor = '#f3e5f5';
+                } else if (cellContent.includes('英语') || cellContent.includes('英文')) {
+                    cell.style.backgroundColor = '#e8f5e8';
+                } else if (cellContent.includes('体育') || cellContent.includes('运动')) {
+                    cell.style.backgroundColor = '#fff3e0';
+                } else if (cellContent.includes('音乐') || cellContent.includes('美术')) {
+                    cell.style.backgroundColor = '#fce4ec';
+                }
+            }
+            
             row.appendChild(cell);
         }
         
         tbody.appendChild(row);
     });
+    
+    // 如果是课程表，添加导出Excel按钮
+    if (isTimetable) {
+        // 检查是否已存在导出按钮
+        let exportBtn = document.querySelector('.export-excel-btn');
+        if (!exportBtn) {
+            exportBtn = document.createElement('button');
+            exportBtn.className = 'btn btn-success export-excel-btn';
+            exportBtn.innerHTML = '<i class="fas fa-file-excel"></i> 导出为Excel';
+            exportBtn.style.marginTop = '10px';
+            exportBtn.onclick = () => exportToExcel(processedData, '课程表');
+            
+            // 添加到表格容器
+            const tableContainer = tableOutput.parentElement;
+            if (tableContainer.querySelector('.table-actions')) {
+                tableContainer.querySelector('.table-actions').appendChild(exportBtn);
+            } else {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'table-actions';
+                actionsDiv.style.marginTop = '15px';
+                actionsDiv.appendChild(exportBtn);
+                tableContainer.appendChild(actionsDiv);
+            }
+        }
+        
+        showToast('检测到课程表数据，已进行优化处理', 'info');
+    }
 }
 
 // 重置结果
