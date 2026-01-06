@@ -1,5 +1,10 @@
 # 🚀 智能OCR识别工具
 
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/bullshitAI52/ocr-tool)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.8+-blue?logo=python)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-2.3+-black?logo=flask)](https://flask.palletsprojects.com/)
+
 一个功能强大的在线图片文字、表格、手写识别工具，支持多种OCR引擎和导出格式。
 
 ## ✨ 主要功能
@@ -35,6 +40,50 @@
 - 自动提取网址和API端点
 - 网址分类和快速操作
 - API端点测试功能
+
+## 📦 GitHub部署
+
+### 从GitHub获取项目
+```bash
+# 克隆项目
+git clone https://github.com/bullshitAI52/ocr-tool.git
+cd ocr-tool
+
+# 或者直接下载ZIP
+# 访问 https://github.com/bullshitAI52/ocr-tool 点击 "Code" -> "Download ZIP"
+```
+
+### 自动安装脚本（Linux/macOS）
+```bash
+# 给安装脚本执行权限
+chmod +x install.sh
+
+# 运行安装脚本
+./install.sh
+```
+
+### 一键部署到Vercel/Netlify
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FbullshitAI52%2Focr-tool)
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/bullshitAI52/ocr-tool)
+
+### GitHub Pages部署（纯前端）
+1. Fork本仓库到你的GitHub账户
+2. 进入仓库设置 -> Pages
+3. 选择部署源为 `main` 分支，根目录 `/`
+4. 点击保存，等待部署完成
+5. 访问 `https://你的用户名.github.io/ocr-tool`
+
+### Docker部署
+```bash
+# 构建Docker镜像
+docker build -t ocr-tool .
+
+# 运行容器
+docker run -p 5000:5000 ocr-tool
+
+# 或者使用docker-compose
+docker-compose up
+```
 
 ## 🚀 快速开始
 
