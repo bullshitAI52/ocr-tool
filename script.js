@@ -10,8 +10,7 @@ let appSettings = {
     // API配置（用户可自定义）
     baiduApiKey: '',
     baiduSecretKey: '',
-    deepseekApiKey: '',
-    deepseekApiUrl: 'https://api.deepseek.com'
+    googleApiKey: ''
 };
 let extractedUrls = [];
 
@@ -411,7 +410,8 @@ async function startBaiduOcr(language, mode) {
         const baiduSecretKey = appSettings.baiduSecretKey;
         
         if (!baiduApiKey || !baiduSecretKey) {
-            throw new Error('百度OCR API密钥未配置');
+            showToast('请先在设置中配置百度OCR API密钥', 'error');
+            throw new Error('百度OCR API密钥未配置，请点击右上角"设置"按钮进行配置');
         }
         
         // 百度OCR需要先获取access_token
@@ -420,12 +420,19 @@ async function startBaiduOcr(language, mode) {
         progressPercent.textContent = '20%';
         
         // 获取access_token
-        const tokenResponse = await fetch(`https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${baiduApiKey}&client_secret=${baiduSecretKey}`, {
-            method: 'POST'
-        });
+        let tokenResponse;
+        try {
+            tokenResponse = await fetch(`https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${baiduApiKey}&client_secret=${baiduSecretKey}`, {
+                method: 'POST'
+            });
+        } catch (fetchError) {
+            console.error('百度OCR网络连接错误:', fetchError);
+            throw new Error(`网络连接失败: ${fetchError.message}。请检查网络连接或API密钥是否正确`);
+        }
         
         if (!tokenResponse.ok) {
-            throw new Error(`获取百度访问令牌失败: ${tokenResponse.status}`);
+            const errorText = await tokenResponse.text().catch(() => '未知错误');
+            throw new Error(`获取百度访问令牌失败: ${tokenResponse.status} - ${errorText}`);
         }
         
         const tokenData = await tokenResponse.json();
@@ -460,16 +467,23 @@ async function startBaiduOcr(language, mode) {
         progressFill.style.width = '60%';
         progressPercent.textContent = '60%';
         
-        const ocrResponse = await fetch(`https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token=${accessToken}`, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json'
-            },
-            body: formData
-        });
+        let ocrResponse;
+        try {
+            ocrResponse = await fetch(`https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token=${accessToken}`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                body: formData
+            });
+        } catch (fetchError) {
+            console.error('百度OCR请求错误:', fetchError);
+            throw new Error(`OCR请求失败: ${fetchError.message}。可能是网络问题或图片太大`);
+        }
         
         if (!ocrResponse.ok) {
-            throw new Error(`百度OCR服务错误: ${ocrResponse.status}`);
+            const errorText = await ocrResponse.text().catch(() => '未知错误');
+            throw new Error(`百度OCR服务错误: ${ocrResponse.status} - ${errorText}`);
         }
         
         progressStatus.textContent = '正在处理百度OCR结果...';
@@ -1264,12 +1278,12 @@ function updateEngineUI() {
     const engine = document.querySelector('input[name="engine"]:checked').value;
     const baiduConfig = document.querySelector('.baidu-config');
     const pythonConfig = document.querySelector('.python-config');
-    const deepseekConfig = document.querySelector('.deepseek-config');
+    const googleConfig = document.querySelector('.google-config');
     
     // 隐藏所有配置区域
     baiduConfig.style.display = 'none';
     pythonConfig.style.display = 'none';
-    deepseekConfig.style.display = 'none';
+    googleConfig.style.display = 'none';
     
     if (engine === 'baidu') {
         baiduConfig.style.display = 'block';
@@ -1284,16 +1298,12 @@ function updateEngineUI() {
         }
     } else if (engine === 'python') {
         pythonConfig.style.display = 'block';
-    } else if (engine === 'deepseek') {
-        deepseekConfig.style.display = 'block';
-        // 填充DeepSeek配置
-        const deepseekApiKeyInput = document.getElementById('deepseekApiKey');
-        const deepseekApiUrlInput = document.getElementById('deepseekApiUrl');
-        if (deepseekApiKeyInput && appSettings.deepseekApiKey) {
-            deepseekApiKeyInput.value = appSettings.deepseekApiKey;
-        }
-        if (deepseekApiUrlInput && appSettings.deepseekApiUrl) {
-            deepseekApiUrlInput.value = appSettings.deepseekApiUrl;
+    } else if (engine === 'google') {
+        googleConfig.style.display = 'block';
+        // 填充Google配置
+        const googleApiKeyInput = document.getElementById('googleApiKey');
+        if (googleApiKeyInput && appSettings.googleApiKey) {
+            googleApiKeyInput.value = appSettings.googleApiKey;
         }
     }
     
@@ -1497,19 +1507,28 @@ async function testBaiduConnection() {
         showToast('正在测试百度OCR连接...', 'info');
         
         // 测试获取access_token
-        const response = await fetch(`https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${baiduApiKey}&client_secret=${baiduSecretKey}`, {
-            method: 'POST'
-        });
+        let response;
+        try {
+            response = await fetch(`https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${baiduApiKey}&client_secret=${baiduSecretKey}`, {
+                method: 'POST'
+            });
+        } catch (fetchError) {
+            console.error('百度OCR连接测试失败:', fetchError);
+            showToast(`网络连接失败: ${fetchError.message}。请检查：\n1. 网络连接\n2. 防火墙设置\n3. 代理配置`, 'error');
+            return;
+        }
         
         if (response.ok) {
             const data = await response.json();
             if (data.access_token) {
-                showToast('百度OCR连接成功！', 'success');
+                showToast(`百度OCR连接成功！\nAccess Token: ${data.access_token.substring(0, 20)}...`, 'success');
+                console.log('百度OCR连接测试成功，access_token:', data.access_token);
             } else {
-                showToast(`百度OCR连接失败: ${data.error_description || '未知错误'}`, 'error');
+                showToast(`百度OCR连接失败: ${data.error_description || '未知错误'}\n请检查API密钥是否正确`, 'error');
             }
         } else {
-            showToast(`百度OCR连接失败: ${response.status}`, 'error');
+            const errorText = await response.text().catch(() => '未知错误');
+            showToast(`百度OCR连接失败: ${response.status}\n${errorText}`, 'error');
         }
     } catch (error) {
         showToast(`百度OCR连接错误: ${error.message}`, 'error');
@@ -1611,8 +1630,7 @@ function showSettings() {
     // 填充设置表单
     document.getElementById('baiduApiKey').value = appSettings.baiduApiKey;
     document.getElementById('baiduSecretKey').value = appSettings.baiduSecretKey;
-    document.getElementById('deepseekApiKey').value = appSettings.deepseekApiKey;
-    document.getElementById('deepseekApiUrl').value = appSettings.deepseekApiUrl;
+    document.getElementById('googleApiKey').value = appSettings.googleApiKey;
     document.getElementById('autoDetectUrls').checked = appSettings.autoDetectUrls;
     document.getElementById('autoDetectApis').checked = appSettings.autoDetectApis;
     document.getElementById('enhanceHandwriting').checked = appSettings.enhanceHandwriting;
@@ -1628,8 +1646,7 @@ function closeSettings() {
 function saveSettings() {
     appSettings.baiduApiKey = document.getElementById('baiduApiKey').value.trim();
     appSettings.baiduSecretKey = document.getElementById('baiduSecretKey').value.trim();
-    appSettings.deepseekApiKey = document.getElementById('deepseekApiKey').value.trim();
-    appSettings.deepseekApiUrl = document.getElementById('deepseekApiUrl').value.trim();
+    appSettings.googleApiKey = document.getElementById('googleApiKey').value.trim();
     appSettings.autoDetectUrls = document.getElementById('autoDetectUrls').checked;
     appSettings.autoDetectApis = document.getElementById('autoDetectApis').checked;
     appSettings.enhanceHandwriting = document.getElementById('enhanceHandwriting').checked;
@@ -1657,8 +1674,7 @@ function resetSettings() {
             // API配置（用户可自定义）
             baiduApiKey: '',
             baiduSecretKey: '',
-            deepseekApiKey: '',
-            deepseekApiUrl: 'https://api.deepseek.com'
+            googleApiKey: ''
         };
         
         localStorage.removeItem('ocrToolSettings');
@@ -1666,8 +1682,7 @@ function resetSettings() {
         // 更新表单
         document.getElementById('baiduApiKey').value = '';
         document.getElementById('baiduSecretKey').value = '';
-        document.getElementById('deepseekApiKey').value = '';
-        document.getElementById('deepseekApiUrl').value = 'https://api.deepseek.com';
+        document.getElementById('googleApiKey').value = '';
         document.getElementById('autoDetectUrls').checked = true;
         document.getElementById('autoDetectApis').checked = true;
         document.getElementById('enhanceHandwriting').checked = true;
@@ -1752,7 +1767,7 @@ function createBatchProcessingUI(files) {
                     <label><input type="radio" name="batchEngine" value="local" checked> 本地引擎</label>
                     <label><input type="radio" name="batchEngine" value="baidu"> 百度OCR</label>
                     <label><input type="radio" name="batchEngine" value="python"> Python后端</label>
-                    <label><input type="radio" name="batchEngine" value="deepseek"> DeepSeek API</label>
+                    <label><input type="radio" name="batchEngine" value="google"> Google Vision</label>
                 </div>
             </div>
             <div class="batch-actions">
@@ -1819,8 +1834,8 @@ async function startBatchProcessing() {
         }
     }
     
-    if (engine === 'deepseek' && !appSettings.deepseekApiKey) {
-        showToast('请先在设置中配置DeepSeek API密钥', 'error');
+    if (engine === 'google' && !appSettings.googleApiKey) {
+        showToast('请先在设置中配置Google Cloud Vision API密钥', 'error');
         return;
     }
     
@@ -1964,8 +1979,8 @@ async function processSingleImage(imageData, language, mode, engine) {
         return await processWithBaidu(imageData, language);
     } else if (engine === 'python') {
         return await processWithPython(imageData, language, mode);
-    } else if (engine === 'deepseek') {
-        return await processWithDeepSeek(imageData, language, mode);
+    } else if (engine === 'google') {
+        return await processWithGoogleVision(imageData, language);
     } else {
         throw new Error(`不支持的引擎: ${engine}`);
     }
@@ -2178,57 +2193,51 @@ async function processWithPython(imageData, language, mode) {
     }
 }
 
-// 使用DeepSeek API处理（批量处理版本）
-async function processWithDeepSeek(imageData, language, mode) {
-    console.log('开始DeepSeek API批量处理');
+// 使用Google Cloud Vision API处理（批量处理版本）
+async function processWithGoogleVision(imageData, language) {
+    console.log('开始Google Cloud Vision API批量处理');
     
     try {
-        // 获取DeepSeek API配置
-        const deepseekApiKey = appSettings.deepseekApiKey;
-        const deepseekApiUrl = appSettings.deepseekApiUrl || 'https://api.deepseek.com';
+        // 获取Google Cloud Vision API配置
+        const googleApiKey = appSettings.googleApiKey;
         
-        if (!deepseekApiKey) {
+        if (!googleApiKey) {
             return {
                 success: false,
-                error: 'DeepSeek API密钥未配置，请在设置中配置',
+                error: 'Google Cloud Vision API密钥未配置，请在设置中配置',
                 text: '',
                 confidence: 0
             };
         }
         
-        // 将base64图片转换为文本描述（DeepSeek API需要文本输入）
-        // 这里简化处理：直接发送图片base64数据
+        // 将base64图片数据提取出来
         const base64Data = imageData.split(',')[1];
         
-        // 构建DeepSeek API请求
+        // 构建Google Cloud Vision API请求
         const requestData = {
-            model: "deepseek-chat",
-            messages: [
+            requests: [
                 {
-                    role: "user",
-                    content: [
+                    image: {
+                        content: base64Data
+                    },
+                    features: [
                         {
-                            type: "text",
-                            text: `请识别这张图片中的文字。语言：${language}，模式：${mode}。图片base64数据如下：`
-                        },
-                        {
-                            type: "image_url",
-                            image_url: {
-                                url: `data:image/jpeg;base64,${base64Data}`
-                            }
+                            type: "TEXT_DETECTION",
+                            maxResults: 1
                         }
-                    ]
+                    ],
+                    imageContext: {
+                        languageHints: [getGoogleLanguageCode(language)]
+                    }
                 }
-            ],
-            max_tokens: 1000
+            ]
         };
         
-        // 发送请求到DeepSeek API
-        const response = await fetch(`${deepseekApiUrl}/chat/completions`, {
+        // 发送请求到Google Cloud Vision API
+        const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${googleApiKey}`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${deepseekApiKey}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(requestData)
         });
@@ -2237,7 +2246,7 @@ async function processWithDeepSeek(imageData, language, mode) {
             const errorText = await response.text();
             return {
                 success: false,
-                error: `DeepSeek API错误: ${response.status} - ${errorText}`,
+                error: `Google Cloud Vision API错误: ${response.status} - ${errorText}`,
                 text: '',
                 confidence: 0
             };
@@ -2248,30 +2257,64 @@ async function processWithDeepSeek(imageData, language, mode) {
         if (result.error) {
             return {
                 success: false,
-                error: `DeepSeek API错误: ${result.error.message}`,
+                error: `Google Cloud Vision API错误: ${result.error.message}`,
                 text: '',
                 confidence: 0
             };
         }
         
-        const text = result.choices?.[0]?.message?.content || '';
+        // 提取识别结果
+        const textAnnotations = result.responses?.[0]?.textAnnotations;
+        let text = '';
+        let confidence = 0;
+        
+        if (textAnnotations && textAnnotations.length > 0) {
+            // 第一个元素是整个文本
+            text = textAnnotations[0].description || '';
+            
+            // 计算平均置信度（如果有的话）
+            if (textAnnotations.length > 1) {
+                const confidences = textAnnotations.slice(1)
+                    .filter(anno => anno.confidence)
+                    .map(anno => anno.confidence);
+                if (confidences.length > 0) {
+                    confidence = confidences.reduce((a, b) => a + b, 0) / confidences.length;
+                }
+            }
+        }
         
         return {
             success: true,
             text: text.trim(),
-            confidence: 0.9, // DeepSeek API不提供置信度，使用默认值
-            engine: 'deepseek'
+            confidence: confidence || 0.95, // Google Vision通常有高置信度
+            engine: 'google'
         };
         
     } catch (error) {
-        console.error('DeepSeek API批量处理错误:', error);
+        console.error('Google Cloud Vision API批量处理错误:', error);
         return {
             success: false,
-            error: `DeepSeek API处理错误: ${error.message}`,
+            error: `Google Cloud Vision API处理错误: ${error.message}`,
             text: '',
             confidence: 0
         };
     }
+}
+
+// 将语言代码转换为Google Cloud Vision支持的语言代码
+function getGoogleLanguageCode(language) {
+    const languageMap = {
+        'chi_sim': 'zh',      // 简体中文
+        'chi_tra': 'zh-TW',   // 繁体中文
+        'eng': 'en',          // 英语
+        'jpn': 'ja',          // 日语
+        'kor': 'ko',          // 韩语
+        'rus': 'ru',          // 俄语
+        'fra': 'fr',          // 法语
+        'deu': 'de',          // 德语
+        'spa': 'es'           // 西班牙语
+    };
+    return languageMap[language] || 'zh';
 }
 
 // 更新批量处理进度
