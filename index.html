@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在线图片文字与表格OCR工具</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-robot"></i> 智能OCR识别工具</h1>
+            <p class="subtitle">支持图片文字、表格、手写识别，提供本地和云端AI识别选项</p>
+        </header>
+
+        <main>
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <h3>点击或拖拽图片到此区域</h3>
+                    <p>支持 JPG、PNG、BMP 格式，最大 10MB</p>
+                    <input type="file" id="fileInput" accept="image/*" hidden>
+                    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                        <i class="fas fa-folder-open"></i> 选择图片
+                    </button>
+                </div>
+                <div class="upload-options">
+                    <div class="option-group">
+                        <label for="languageSelect"><i class="fas fa-language"></i> 识别语言：</label>
+                        <select id="languageSelect">
+                            <option value="chi_sim">简体中文</option>
+                            <option value="eng">英语</option>
+                            <option value="chi_tra">繁体中文</option>
+                            <option value="jpn">日语</option>
+                            <option value="kor">韩语</option>
+                            <option value="rus">俄语</option>
+                            <option value="fra">法语</option>
+                            <option value="deu">德语</option>
+                            <option value="spa">西班牙语</option>
+                        </select>
+                    </div>
+                    <div class="option-group">
+                        <label><i class="fas fa-cogs"></i> 识别模式：</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="mode" value="text" checked> 文字识别</label>
+                            <label><input type="radio" name="mode" value="table"> 表格识别</label>
+                            <label><input type="radio" name="mode" value="handwriting"> 手写识别 (AI)</label>
+                        </div>
+                    </div>
+                    <div class="option-group">
+                        <label><i class="fas fa-cloud"></i> 识别引擎：</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="engine" value="local" checked> 本地引擎 (Tesseract)</label>
+                            <label><input type="radio" name="engine" value="python"> Python后端 (免费)</label>
+                            <label><input type="radio" name="engine" value="baidu"> 百度OCR (API)</label>
+                            <label><input type="radio" name="engine" value="api"> 其他云端AI</label>
+                        </div>
+                    </div>
+                    <div class="option-group api-config" style="display: none;">
+                        <label><i class="fas fa-key"></i> API配置：</label>
+                        <div class="api-inputs">
+                            <input type="text" id="apiUrl" placeholder="API端点URL (可选)" class="api-input">
+                            <input type="text" id="apiKey" placeholder="API密钥 (可选)" class="api-input">
+                            <button class="btn btn-small" onclick="testApiConnection()">
+                                <i class="fas fa-plug"></i> 测试连接
+                            </button>
+                        </div>
+                    </div>
+                    <div class="option-group baidu-config" style="display: none;">
+                        <label><i class="fas fa-key"></i> 百度OCR配置：</label>
+                        <div class="api-inputs">
+                            <input type="text" id="baiduApiKey" placeholder="API Key" class="api-input">
+                            <input type="text" id="baiduSecretKey" placeholder="Secret Key" class="api-input">
+                            <button class="btn btn-small" onclick="testBaiduConnection()">
+                                <i class="fas fa-plug"></i> 测试百度连接
+                            </button>
+                        </div>
+                    </div>
+                    <div class="option-group python-config" style="display: none;">
+                        <label><i class="fas fa-server"></i> Python后端配置：</label>
+                        <div class="api-inputs">
+                            <input type="text" id="pythonServerUrl" placeholder="http://localhost:5000" class="api-input" value="http://localhost:5000">
+                            <div class="python-libs">
+                                <label><input type="checkbox" id="useEasyOcr" checked> EasyOCR</label>
+                                <label><input type="checkbox" id="usePaddleOcr" checked> PaddleOCR</label>
+                                <label><input type="checkbox" id="useOcrSpace" checked> OCR.space (免费API)</label>
+                            </div>
+                            <button class="btn btn-small" onclick="testPythonConnection()">
+                                <i class="fas fa-plug"></i> 测试Python服务
+                            </button>
+                            <button class="btn btn-small btn-info" onclick="showPythonSetup()">
+                                <i class="fas fa-info-circle"></i> 部署指南
+                            </button>
+                        </div>
+                    </div>
+                    <button class="btn btn-success" id="startOcrBtn" disabled>
+                        <i class="fas fa-play"></i> 开始识别
+                    </button>
+                </div>
+            </div>
+
+            <div class="content-section">
+                <div class="preview-section">
+                    <h3><i class="fas fa-eye"></i> 图片预览</h3>
+                    <div class="preview-container">
+                        <img id="imagePreview" src="" alt="图片预览">
+                        <div class="preview-placeholder" id="previewPlaceholder">
+                            <i class="fas fa-image"></i>
+                            <p>图片将在这里显示</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="result-section">
+                    <h3><i class="fas fa-file-alt"></i> 识别结果</h3>
+                    <div class="result-tabs">
+                        <button class="tab-btn active" data-tab="textResult">文字结果</button>
+                        <button class="tab-btn" data-tab="tableResult">表格结果</button>
+                        <button class="tab-btn" data-tab="urlResult">网址/API提取</button>
+                        <button class="tab-btn" data-tab="historyResult">历史记录</button>
+                        <button class="tab-btn" data-tab="rawResult">原始数据</button>
+                    </div>
+                    <div class="tab-content">
+                        <div id="textResult" class="tab-pane active">
+                            <textarea id="textOutput" placeholder="识别出的文字将显示在这里..." readonly></textarea>
+                            <div class="result-actions">
+                                <button class="btn btn-secondary" onclick="copyText()">
+                                    <i class="fas fa-copy"></i> 复制文字
+                                </button>
+                                <div class="dropdown">
+                                    <button class="btn btn-secondary dropdown-toggle" onclick="toggleExportDropdown()">
+                                        <i class="fas fa-download"></i> 导出格式
+                                    </button>
+                                    <div class="dropdown-menu" id="exportDropdown">
+                                        <a href="javascript:void(0)" onclick="exportText('txt')">
+                                            <i class="fas fa-file-alt"></i> TXT 文本文件
+                                        </a>
+                                        <a href="javascript:void(0)" onclick="exportText('docx')">
+                                            <i class="fas fa-file-word"></i> DOCX Word文档
+                                        </a>
+                                        <a href="javascript:void(0)" onclick="exportText('pdf')">
+                                            <i class="fas fa-file-pdf"></i> PDF 文档
+                                        </a>
+                                        <a href="javascript:void(0)" onclick="exportText('json')">
+                                            <i class="fas fa-file-code"></i> JSON 数据
+                                        </a>
+                                        <a href="javascript:void(0)" onclick="exportText('html')">
+                                            <i class="fas fa-file-code"></i> HTML 网页
+                                        </a>
+                                        <a href="javascript:void(0)" onclick="exportText('md')">
+                                            <i class="fas fa-file-alt"></i> Markdown
+                                        </a>
+                                    </div>
+                                </div>
+                                <button class="btn btn-secondary" onclick="saveToHistory()">
+                                    <i class="fas fa-save"></i> 保存记录
+                                </button>
+                                <button class="btn btn-secondary" onclick="clearText()">
+                                    <i class="fas fa-trash"></i> 清空
+                                </button>
+                            </div>
+                        </div>
+                        <div id="tableResult" class="tab-pane">
+                            <div class="table-container">
+                                <table id="tableOutput">
+                                    <thead>
+                                        <tr>
+                                            <th>列1</th>
+                                            <th>列2</th>
+                                            <th>列3</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="3" class="no-data">识别表格数据将显示在这里</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="result-actions">
+                                <div class="dropdown">
+                                    <button class="btn btn-secondary dropdown-toggle" onclick="toggleTableExportDropdown()">
+                                        <i class="fas fa-download"></i> 导出表格
+                                    </button>
+                                    <div class="dropdown-menu" id="tableExportDropdown">
+                                        <a href="javascript:void(0)" onclick="exportTable('csv')">
+                                            <i class="fas fa-file-csv"></i> CSV 表格
+                                        </a>
+                                        <a href="javascript:void(0)" onclick="exportTable('excel')">
+                                            <i class="fas fa-file-excel"></i> Excel (XLSX)
+                                        </a>
+                                        <a href="javascript:void(0)" onclick="exportTable('json')">
+                                            <i class="fas fa-file-code"></i> JSON 数据
+                                        </a>
+                                        <a href="javascript:void(0)" onclick="exportTable('html')">
+                                            <i class="fas fa-file-code"></i> HTML 表格
+                                        </a>
+                                        <a href="javascript:void(0)" onclick="exportTable('sql')">
+                                            <i class="fas fa-database"></i> SQL 插入语句
+                                        </a>
+                                    </div>
+                                </div>
+                                <button class="btn btn-secondary" onclick="saveTableToHistory()">
+                                    <i class="fas fa-save"></i> 保存表格
+                                </button>
+                            </div>
+                        </div>
+                        <div id="urlResult" class="tab-pane">
+                            <div class="url-extraction">
+                                <h4><i class="fas fa-link"></i> 提取到的网址和API端点</h4>
+                                <div class="url-list" id="urlList">
+                                    <div class="no-data">识别结果中的网址和API将显示在这里</div>
+                                </div>
+                                <div class="result-actions">
+                                    <button class="btn btn-secondary" onclick="copyUrls()">
+                                        <i class="fas fa-copy"></i> 复制网址
+                                    </button>
+                                    <button class="btn btn-secondary" onclick="openUrls()">
+                                        <i class="fas fa-external-link-alt"></i> 打开网址
+                                    </button>
+                                    <button class="btn btn-secondary" onclick="testApiEndpoints()">
+                                        <i class="fas fa-bolt"></i> 测试API
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="historyResult" class="tab-pane">
+                            <div class="history-section">
+                                <div class="history-header">
+                                    <h4><i class="fas fa-history"></i> 识别历史记录</h4>
+                                    <div class="history-actions">
+                                        <button class="btn btn-small" onclick="clearHistory()">
+                                            <i class="fas fa-trash"></i> 清空历史
+                                        </button>
+                                        <button class="btn btn-small" onclick="exportHistory()">
+                                            <i class="fas fa-download"></i> 导出历史
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="history-list" id="historyList">
+                                    <div class="no-data">暂无历史记录</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="rawResult" class="tab-pane">
+                            <pre id="rawOutput">{
+  "识别状态": "等待上传图片",
+  "语言": "未选择",
+  "引擎": "本地",
+  "置信度": 0,
+  "数据": {}
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="progress-section" id="progressSection" style="display: none;">
+                <h3><i class="fas fa-sync-alt fa-spin"></i> 正在识别中...</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-info">
+                    <span id="progressStatus">初始化...</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Powered by Tesseract.js & AI引擎 | 技术支持：OCR识别引擎 | 
+                <a href="javascript:void(0)" onclick="showAbout()">关于本工具</a> | 
+                <a href="javascript:void(0)" onclick="showSettings()">设置</a>
+            </p>
+            <p class="tip"><i class="fas fa-lightbulb"></i> 提示：手写识别和云端AI需要配置API，表格识别支持复杂结构</p>
+        </footer>
+    </div>
+
+    <div class="modal" id="aboutModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-info-circle"></i> 关于智能OCR工具</h3>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>本工具基于 Tesseract.js 和AI技术构建，提供本地和云端OCR识别功能。</p>
+                <h4>功能特点：</h4>
+                <ul>
+                    <li>支持多种语言识别（中文、英文、日文等）</li>
+                    <li>AI手写文字识别（云端引擎）</li>
+                    <li>网址和API端点自动提取</li>
+                    <li>本地处理保护隐私，云端AI提供更高精度</li>
+                    <li>实时预览识别进度</li>
+                    <li>文字、表格、网址结果提取和导出</li>
+                </ul>
+                <h4>使用限制：</h4>
+                <ul>
+                    <li>图片大小不超过10MB</li>
+                    <li>云端AI需要API密钥</li>
+                    <li>手写识别准确度依赖AI模型</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-cog"></i> 设置</h3>
+                <button class="close-btn" onclick="closeSettings()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h4><i class="fas fa-cloud"></i> 云端AI配置</h4>
+                    <div class="setting-item">
+                        <label>默认API端点：</label>
+                        <input type="text" id="defaultApiUrl" placeholder="https://api.example.com/ocr" class="setting-input">
+                    </div>
+                    <div class="setting-item">
+                        <label>API密钥：</label>
+                        <input type="password" id="defaultApiKey" placeholder="输入API密钥" class="setting-input">
+                    </div>
+                    <div class="setting-item">
+                        <label>AI提供商：</label>
+                        <select id="aiProvider" class="setting-select">
+                            <option value="custom">自定义API</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="google">Google Cloud Vision</option>
+                            <option value="azure">Azure Cognitive Services</option>
+                            <option value="baidu">百度AI</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h4><i class="fas fa-cogs"></i> 百度OCR配置</h4>
+                    <div class="setting-item">
+                        <label>API Key：</label>
+                        <input type="text" id="baiduApiKey" placeholder="百度API Key" class="setting-input">
+                    </div>
+                    <div class="setting-item">
+                        <label>Secret Key：</label>
+                        <input type="password" id="baiduSecretKey" placeholder="百度Secret Key" class="setting-input">
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h4><i class="fas fa-server"></i> Python后端配置</h4>
+                    <div class="setting-item">
+                        <label>服务器地址：</label>
+                        <input type="text" id="pythonServerUrl" placeholder="http://localhost:5000" class="setting-input" value="http://localhost:5000">
+                    </div>
+                    <div class="setting-item">
+                        <label>OCR库选择：</label>
+                        <div class="checkbox-group">
+                            <label><input type="checkbox" id="useEasyOcr" checked> EasyOCR</label>
+                            <label><input type="checkbox" id="usePaddleOcr" checked> PaddleOCR</label>
+                            <label><input type="checkbox" id="useOcrSpace" checked> OCR.space (免费API)</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h4><i class="fas fa-magic"></i> 识别选项</h4>
+                    <div class="setting-item">
+                        <label><input type="checkbox" id="autoDetectUrls" checked> 自动提取网址</label>
+                    </div>
+                    <div class="setting-item">
+                        <label><input type="checkbox" id="autoDetectApis" checked> 自动提取API端点</label>
+                    </div>
+                    <div class="setting-item">
+                        <label><input type="checkbox" id="enhanceHandwriting" checked> 手写识别增强</label>
+                    </div>
+                    <div class="setting-item">
+                        <label><input type="checkbox" id="saveHistory" checked> 自动保存历史记录</label>
+                    </div>
+                    <div class="setting-item">
+                        <label><input type="checkbox" id="saveSettings" checked> 保存设置到本地</label>
+                    </div>
+                </div>
+                
+                <div class="settings-actions">
+                    <button class="btn btn-primary" onclick="saveSettings()">
+                        <i class="fas fa-save"></i> 保存设置
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetSettings()">
+                        <i class="fas fa-undo"></i> 恢复默认
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="pythonSetupModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-code"></i> Python后端部署指南</h3>
+                <button class="close-btn" onclick="closePythonSetup()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setup-section">
+                    <h4><i class="fas fa-terminal"></i> 1. 安装Python依赖</h4>
+                    <pre><code>pip install flask flask-cors pillow
+pip install easyocr paddleocr
+# 或者使用 requirements.txt</code></pre>
+                </div>
+                
+                <div class="setup-section">
+                    <h4><i class="fas fa-file-code"></i> 2. 创建Python服务器 (server.py)</h4>
+                    <pre><code>from flask import Flask, request, jsonify
+from flask_cors import CORS
+import easyocr
+import base64
+from io import BytesIO
+from PIL import Image
+
+app = Flask(__name__)
+CORS(app)
+
+reader = easyocr.Reader(['ch_sim', 'en'])
+
+@app.route('/ocr', methods=['POST'])
+def ocr():
+    try:
+        data = request.json
+        image_data = data['image'].split(',')[1]
+        image = Image.open(BytesIO(base64.b64decode(image_data)))
+        
+        result = reader.readtext(image)
+        text = ' '.join([item[1] for item in result])
+        
+        return jsonify({
+            'success': True,
+            'text': text,
+            'confidence': 0.95
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)</code></pre>
+                </div>
+                
+                <div class="setup-section">
+                    <h4><i class="fas fa-play"></i> 3. 启动服务器</h4>
+                    <pre><code>python server.py</code></pre>
+                </div>
+                
+                <div class="setup-section">
+                    <h4><i class="fas fa-check-circle"></i> 4. 测试连接</h4>
+                    <p>确保服务器运行在 <code>http://localhost:5000</code>，然后在工具中测试连接。</p>
+                </div>
+                
+                <div class="setup-actions">
+                    <button class="btn btn-primary" onclick="copyPythonCode()">
+                        <i class="fas fa-copy"></i> 复制代码
+                    </button>
+                    <button class="btn btn-secondary" onclick="closePythonSetup()">
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
