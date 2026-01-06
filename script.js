@@ -25,6 +25,7 @@ const imagePreview = document.getElementById('imagePreview');
 const previewPlaceholder = document.getElementById('previewPlaceholder');
 const startOcrBtn = document.getElementById('startOcrBtn');
 const languageSelect = document.getElementById('languageSelect');
+const selectImageBtn = document.getElementById('selectImageBtn');
 const textOutput = document.getElementById('textOutput');
 const tableOutput = document.getElementById('tableOutput');
 const rawOutput = document.getElementById('rawOutput');
@@ -44,6 +45,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('uploadArea:', uploadArea ? '找到' : '未找到');
     console.log('imagePreview:', imagePreview ? '找到' : '未找到');
     console.log('startOcrBtn:', startOcrBtn ? '找到' : '未找到');
+    console.log('selectImageBtn:', selectImageBtn ? '找到' : '未找到');
     
     loadSettings();
     initEventListeners();
@@ -83,8 +85,20 @@ function initEventListeners() {
         }
     });
     
-    // 点击上传区域
-    uploadArea.addEventListener('click', () => {
+    // 选择图片按钮
+    if (selectImageBtn) {
+        selectImageBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // 阻止事件冒泡
+            fileInput.click();
+        });
+    }
+    
+    // 点击上传区域（除了按钮以外的区域）
+    uploadArea.addEventListener('click', (e) => {
+        // 如果点击的是按钮，不处理
+        if (e.target === selectImageBtn || selectImageBtn.contains(e.target)) {
+            return;
+        }
         fileInput.click();
     });
     
